@@ -134,8 +134,12 @@ SIMPLE_JWT = {
 }
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',')
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:5173,http://127.0.0.1:5173,https://attendance-app-two-wine.vercel.app'
+).split(',')
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all in development
+CORS_ALLOW_CREDENTIALS = True
 
 # Office Location Settings (GPS)
 OFFICE_LATITUDE = float(os.environ.get('OFFICE_LATITUDE', '28.6139'))
