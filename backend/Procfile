@@ -1,1 +1,1 @@
-web: gunicorn config.wsgi:application --timeout 120 --workers 2 --threads 4 --worker-class gthread
+web: gunicorn config.wsgi:application --timeout 120 --workers 1 --threads 2 --max-requests 100 --max-requests-jitter 10
