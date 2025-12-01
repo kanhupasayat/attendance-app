@@ -136,7 +136,7 @@ SIMPLE_JWT = {
 # CORS Settings
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,https://attendance-app-two-wine.vercel.app'
+    'http://localhost:5173,http://127.0.0.1:5173,https://attendance-app-two-wine.vercel.app,https://attendance-app-k69a.vercel.app'
 ).split(',')
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all in development
 CORS_ALLOW_CREDENTIALS = True
