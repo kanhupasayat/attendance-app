@@ -465,20 +465,24 @@ class ReviewProfileUpdateRequestView(APIView):
                 if requested_value is not None:
                     setattr(user, user_field, requested_value)
 
-            # Handle photo updates - copy the file name directly to avoid re-upload
-            if update_request.requested_photo and update_request.requested_photo.name:
-                user.photo.name = update_request.requested_photo.name
-            if update_request.requested_aadhaar_photo and update_request.requested_aadhaar_photo.name:
-                user.aadhaar_photo.name = update_request.requested_aadhaar_photo.name
-            if update_request.requested_pan_photo and update_request.requested_pan_photo.name:
-                user.pan_photo.name = update_request.requested_pan_photo.name
-
-            user.save(update_fields=[
+            # Handle photo updates - just copy the Cloudinary path (no re-upload)
+            update_fields = [
                 'name', 'email', 'father_name', 'father_phone',
                 'aadhaar_number', 'pan_number', 'bank_account_number',
                 'bank_holder_name', 'bank_name', 'bank_ifsc', 'address',
-                'photo', 'aadhaar_photo', 'pan_photo'
-            ])
+            ]
+
+            if update_request.requested_photo:
+                user.photo = update_request.requested_photo.name
+                update_fields.append('photo')
+            if update_request.requested_aadhaar_photo:
+                user.aadhaar_photo = update_request.requested_aadhaar_photo.name
+                update_fields.append('aadhaar_photo')
+            if update_request.requested_pan_photo:
+                user.pan_photo = update_request.requested_pan_photo.name
+                update_fields.append('pan_photo')
+
+            user.save(update_fields=update_fields)
 
         # Notify employee (with email)
         notify_profile_update_status(update_request, action, remarks)
