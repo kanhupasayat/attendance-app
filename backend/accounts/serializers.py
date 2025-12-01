@@ -79,6 +79,27 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_has_pending_update(self, obj):
         return ProfileUpdateRequest.objects.filter(user=obj, status='pending').exists()
 
+    def validate_photo(self, value):
+        """Compress profile photo on upload"""
+        if value:
+            from .image_utils import compress_profile_photo
+            return compress_profile_photo(value)
+        return value
+
+    def validate_aadhaar_photo(self, value):
+        """Compress aadhaar photo on upload"""
+        if value:
+            from .image_utils import compress_document_photo
+            return compress_document_photo(value)
+        return value
+
+    def validate_pan_photo(self, value):
+        """Compress pan photo on upload"""
+        if value:
+            from .image_utils import compress_document_photo
+            return compress_document_photo(value)
+        return value
+
 
 class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
@@ -274,3 +295,24 @@ class ProfileUpdateRequestCreateSerializer(serializers.Serializer):
 
     # Reason for update
     reason = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_photo(self, value):
+        """Compress profile photo"""
+        if value:
+            from .image_utils import compress_profile_photo
+            return compress_profile_photo(value)
+        return value
+
+    def validate_aadhaar_photo(self, value):
+        """Compress aadhaar photo"""
+        if value:
+            from .image_utils import compress_document_photo
+            return compress_document_photo(value)
+        return value
+
+    def validate_pan_photo(self, value):
+        """Compress pan photo"""
+        if value:
+            from .image_utils import compress_document_photo
+            return compress_document_photo(value)
+        return value
