@@ -419,13 +419,27 @@ class ReviewProfileUpdateRequestView(APIView):
     permission_classes = [IsAdminUser]
 
     def post(self, request, pk):
+        # Get raw data from database without loading files
         try:
-            update_request = ProfileUpdateRequest.objects.get(pk=pk, status='pending')
-        except ProfileUpdateRequest.DoesNotExist:
-            return Response(
-                {'error': 'Pending request not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            request_data = ProfileUpdateRequest.objects.filter(
+                pk=pk, status='pending'
+            ).values(
+                'id', 'user_id',
+                'requested_name', 'requested_email',
+                'requested_father_name', 'requested_father_phone',
+                'requested_aadhaar_number', 'requested_pan_number',
+                'requested_bank_account_number', 'requested_bank_holder_name',
+                'requested_bank_name', 'requested_bank_ifsc', 'requested_address',
+                'requested_photo', 'requested_aadhaar_photo', 'requested_pan_photo'
+            ).first()
+
+            if not request_data:
+                return Response(
+                    {'error': 'Pending request not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         action = request.data.get('status')
         remarks = request.data.get('review_remarks', '')
@@ -436,16 +450,18 @@ class ReviewProfileUpdateRequestView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        update_request.status = action
-        update_request.review_remarks = remarks
-        update_request.reviewed_by = request.user
-        update_request.reviewed_on = timezone.now()
-        update_request.save()
-
-        user = update_request.user
+        # Update the request status
+        ProfileUpdateRequest.objects.filter(pk=pk).update(
+            status=action,
+            review_remarks=remarks,
+            reviewed_by=request.user,
+            reviewed_on=timezone.now()
+        )
 
         if action == 'approved':
-            # Apply the changes to user profile
+            # Build update dict for user
+            user_updates = {}
+
             field_mapping = {
                 'name': 'requested_name',
                 'email': 'requested_email',
@@ -461,33 +477,37 @@ class ReviewProfileUpdateRequestView(APIView):
             }
 
             for user_field, request_field in field_mapping.items():
-                requested_value = getattr(update_request, request_field)
-                if requested_value is not None:
-                    setattr(user, user_field, requested_value)
+                value = request_data.get(request_field)
+                if value is not None:
+                    user_updates[user_field] = value
 
-            # Handle photo updates - just copy the Cloudinary path (no re-upload)
-            update_fields = [
-                'name', 'email', 'father_name', 'father_phone',
-                'aadhaar_number', 'pan_number', 'bank_account_number',
-                'bank_holder_name', 'bank_name', 'bank_ifsc', 'address',
-            ]
+            # Handle photo paths directly (raw strings from DB)
+            if request_data.get('requested_photo'):
+                user_updates['photo'] = request_data['requested_photo']
+            if request_data.get('requested_aadhaar_photo'):
+                user_updates['aadhaar_photo'] = request_data['requested_aadhaar_photo']
+            if request_data.get('requested_pan_photo'):
+                user_updates['pan_photo'] = request_data['requested_pan_photo']
 
-            if update_request.requested_photo:
-                user.photo = update_request.requested_photo.name
-                update_fields.append('photo')
-            if update_request.requested_aadhaar_photo:
-                user.aadhaar_photo = update_request.requested_aadhaar_photo.name
-                update_fields.append('aadhaar_photo')
-            if update_request.requested_pan_photo:
-                user.pan_photo = update_request.requested_pan_photo.name
-                update_fields.append('pan_photo')
+            # Direct database update - no file operations
+            if user_updates:
+                User.objects.filter(pk=request_data['user_id']).update(**user_updates)
 
-            user.save(update_fields=update_fields)
-
-        # Notify employee (with email)
-        notify_profile_update_status(update_request, action, remarks)
+        # Send notification (in-app only)
+        try:
+            user = User.objects.get(pk=request_data['user_id'])
+            notification_type = 'profile_update_approved' if action == 'approved' else 'profile_update_rejected'
+            Notification.objects.create(
+                user=user,
+                title=f"Profile Update {action.title()}",
+                message=f"Your profile update request has been {action}.",
+                notification_type=notification_type,
+                related_id=pk
+            )
+        except Exception:
+            pass  # Ignore notification errors
 
         return Response({
             'message': f'Profile update request {action}',
-            'request_id': update_request.id
+            'request_id': pk
         })
