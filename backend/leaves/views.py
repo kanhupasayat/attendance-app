@@ -1,0 +1,892 @@
+from rest_framework import status, generics, permissions
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.utils import timezone
+from django.db.models import Sum
+import csv
+from django.http import HttpResponse
+
+from .models import LeaveType, LeaveBalance, LeaveRequest, Holiday
+from .serializers import (
+    LeaveTypeSerializer, LeaveBalanceSerializer, LeaveRequestSerializer,
+    LeaveApplySerializer, LeaveReviewSerializer, HolidaySerializer
+)
+from accounts.views import IsAdminUser
+from accounts.utils import notify_leave_applied, notify_leave_status
+
+
+class LeaveTypeListView(generics.ListCreateAPIView):
+    serializer_class = LeaveTypeSerializer
+    queryset = LeaveType.objects.filter(is_active=True)
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+
+class LeaveTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = LeaveTypeSerializer
+    queryset = LeaveType.objects.all()
+
+
+class MyLeaveBalanceView(APIView):
+    def get(self, request):
+        year = int(request.query_params.get('year', timezone.now().year))
+        month = int(request.query_params.get('month', timezone.now().month))
+
+        # Get or create balance for current month
+        leave_types = LeaveType.objects.filter(is_active=True)
+        balances = []
+
+        for lt in leave_types:
+            balance, created = LeaveBalance.objects.get_or_create(
+                user=request.user,
+                leave_type=lt,
+                year=year,
+                month=month,
+                defaults={
+                    'total_leaves': 5,
+                    'used_leaves': 0,
+                    'carried_forward': 0,
+                    'lop_days': 0
+                }
+            )
+
+            # If new month balance created, calculate carry forward from previous month
+            if created and month > 1:
+                prev_balance = LeaveBalance.objects.filter(
+                    user=request.user,
+                    leave_type=lt,
+                    year=year,
+                    month=month - 1
+                ).first()
+                if prev_balance:
+                    unused = float(prev_balance.total_leaves) + float(prev_balance.carried_forward) - float(prev_balance.used_leaves)
+                    balance.carried_forward = max(0, unused)
+                    balance.save()
+            elif created and month == 1:
+                # January - check December of previous year
+                prev_balance = LeaveBalance.objects.filter(
+                    user=request.user,
+                    leave_type=lt,
+                    year=year - 1,
+                    month=12
+                ).first()
+                if prev_balance:
+                    unused = float(prev_balance.total_leaves) + float(prev_balance.carried_forward) - float(prev_balance.used_leaves)
+                    balance.carried_forward = max(0, unused)
+                    balance.save()
+
+            balances.append(balance)
+
+        return Response(LeaveBalanceSerializer(balances, many=True).data)
+
+
+class LeaveApplyView(APIView):
+    def post(self, request):
+        serializer = LeaveApplySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        leave_type = serializer.validated_data['leave_type']
+        start_date = serializer.validated_data['start_date']
+        end_date = serializer.validated_data['end_date']
+        is_half_day = serializer.validated_data.get('is_half_day', False)
+
+        # Calculate total days
+        if is_half_day:
+            total_days = 0.5
+        else:
+            total_days = (end_date - start_date).days + 1
+
+        # Check leave balance for the month of leave start date
+        year = start_date.year
+        month = start_date.month
+
+        # Get or create balance for this month
+        balance, created = LeaveBalance.objects.get_or_create(
+            user=request.user,
+            leave_type=leave_type,
+            year=year,
+            month=month,
+            defaults={
+                'total_leaves': 5,
+                'used_leaves': 0,
+                'carried_forward': 0,
+                'lop_days': 0
+            }
+        )
+
+        # If new balance created, calculate carry forward from previous month
+        if created:
+            if month > 1:
+                prev_balance = LeaveBalance.objects.filter(
+                    user=request.user,
+                    leave_type=leave_type,
+                    year=year,
+                    month=month - 1
+                ).first()
+            else:
+                prev_balance = LeaveBalance.objects.filter(
+                    user=request.user,
+                    leave_type=leave_type,
+                    year=year - 1,
+                    month=12
+                ).first()
+
+            if prev_balance:
+                unused = float(prev_balance.total_leaves) + float(prev_balance.carried_forward) - float(prev_balance.used_leaves)
+                balance.carried_forward = max(0, unused)
+                balance.save()
+
+        # Calculate paid days and LOP days
+        available = float(balance.available_leaves)
+        paid_days = 0
+        lop_days = 0
+        is_lop = False
+
+        if total_days <= available:
+            # All days are paid
+            paid_days = total_days
+            lop_days = 0
+        else:
+            # Partial paid, partial LOP
+            paid_days = max(0, available)
+            lop_days = total_days - paid_days
+            is_lop = lop_days > 0
+
+        # Check for overlapping leave requests
+        overlapping = LeaveRequest.objects.filter(
+            user=request.user,
+            status__in=['pending', 'approved'],
+            start_date__lte=end_date,
+            end_date__gte=start_date
+        ).exists()
+
+        if overlapping:
+            return Response(
+                {"error": "You have overlapping leave requests"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        leave_request = LeaveRequest.objects.create(
+            user=request.user,
+            leave_type=leave_type,
+            start_date=start_date,
+            end_date=end_date,
+            is_half_day=is_half_day,
+            half_day_type=serializer.validated_data.get('half_day_type', ''),
+            reason=serializer.validated_data['reason'],
+            paid_days=paid_days,
+            lop_days=lop_days,
+            is_lop=is_lop
+        )
+
+        # Notify admins about new leave request
+        notify_leave_applied(leave_request)
+
+        return Response({
+            "message": "Leave request submitted",
+            "paid_days": paid_days,
+            "lop_days": lop_days,
+            "data": LeaveRequestSerializer(leave_request).data
+        }, status=status.HTTP_201_CREATED)
+
+
+class MyLeaveRequestsView(generics.ListAPIView):
+    serializer_class = LeaveRequestSerializer
+
+    def get_queryset(self):
+        return LeaveRequest.objects.filter(
+            user=self.request.user
+        ).select_related('leave_type', 'reviewed_by')
+
+
+class CancelLeaveRequestView(APIView):
+    def post(self, request, pk):
+        try:
+            leave_request = LeaveRequest.objects.get(
+                pk=pk, user=request.user
+            )
+        except LeaveRequest.DoesNotExist:
+            return Response(
+                {"error": "Leave request not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if leave_request.status != 'pending':
+            return Response(
+                {"error": "Can only cancel pending requests"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        leave_request.status = 'cancelled'
+        leave_request.save()
+
+        return Response({"message": "Leave request cancelled"})
+
+
+# Admin views
+class AllLeaveRequestsView(generics.ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = LeaveRequestSerializer
+
+    def get_queryset(self):
+        queryset = LeaveRequest.objects.all().select_related(
+            'user', 'leave_type', 'reviewed_by'
+        )
+
+        status_filter = self.request.query_params.get('status')
+        user_id = self.request.query_params.get('user_id')
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        return queryset
+
+
+class ReviewLeaveRequestView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        try:
+            leave_request = LeaveRequest.objects.get(pk=pk)
+        except LeaveRequest.DoesNotExist:
+            return Response(
+                {"error": "Leave request not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if leave_request.status != 'pending':
+            return Response(
+                {"error": "This request has already been reviewed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = LeaveReviewSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        new_status = serializer.validated_data['status']
+        remarks = serializer.validated_data.get('remarks', '')
+
+        leave_request.status = new_status
+        leave_request.reviewed_by = request.user
+        leave_request.reviewed_on = timezone.now()
+        leave_request.review_remarks = remarks
+        leave_request.save()
+
+        # If approved, update leave balance for the month
+        if new_status == 'approved':
+            year = leave_request.start_date.year
+            month = leave_request.start_date.month
+
+            balance, created = LeaveBalance.objects.get_or_create(
+                user=leave_request.user,
+                leave_type=leave_request.leave_type,
+                year=year,
+                month=month,
+                defaults={
+                    'total_leaves': 5,
+                    'used_leaves': 0,
+                    'carried_forward': 0,
+                    'lop_days': 0
+                }
+            )
+
+            # Update used leaves and LOP
+            balance.used_leaves += leave_request.paid_days
+            balance.lop_days += leave_request.lop_days
+            balance.save()
+
+            # Mark attendance as on_leave for approved dates
+            from attendance.models import Attendance
+            current_date = leave_request.start_date
+            while current_date <= leave_request.end_date:
+                Attendance.objects.update_or_create(
+                    user=leave_request.user,
+                    date=current_date,
+                    defaults={'status': 'on_leave'}
+                )
+                current_date += timezone.timedelta(days=1)
+
+        # Notify employee about leave status (with email)
+        notify_leave_status(leave_request, new_status, remarks)
+
+        return Response({
+            "message": f"Leave request {new_status}",
+            "data": LeaveRequestSerializer(leave_request).data
+        })
+
+
+class AllLeaveBalancesView(generics.ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = LeaveBalanceSerializer
+
+    def get_queryset(self):
+        year = int(self.request.query_params.get('year', timezone.now().year))
+        month = int(self.request.query_params.get('month', timezone.now().month))
+        return LeaveBalance.objects.filter(year=year, month=month).select_related(
+            'user', 'leave_type'
+        )
+
+
+class InitializeLeaveBalanceView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        """Initialize leave balances for all employees for a given month"""
+        year = int(request.data.get('year', timezone.now().year))
+        month = int(request.data.get('month', timezone.now().month))
+
+        from accounts.models import User
+        employees = User.objects.filter(role='employee', is_active=True)
+        leave_types = LeaveType.objects.filter(is_active=True)
+
+        created_count = 0
+        for emp in employees:
+            for lt in leave_types:
+                balance, created = LeaveBalance.objects.get_or_create(
+                    user=emp,
+                    leave_type=lt,
+                    year=year,
+                    month=month,
+                    defaults={
+                        'total_leaves': 5,
+                        'used_leaves': 0,
+                        'carried_forward': 0,
+                        'lop_days': 0
+                    }
+                )
+
+                # Calculate carry forward from previous month
+                if created:
+                    if month > 1:
+                        prev_balance = LeaveBalance.objects.filter(
+                            user=emp, leave_type=lt, year=year, month=month - 1
+                        ).first()
+                    else:
+                        prev_balance = LeaveBalance.objects.filter(
+                            user=emp, leave_type=lt, year=year - 1, month=12
+                        ).first()
+
+                    if prev_balance:
+                        unused = float(prev_balance.total_leaves) + float(prev_balance.carried_forward) - float(prev_balance.used_leaves)
+                        balance.carried_forward = max(0, unused)
+                        balance.save()
+
+                    created_count += 1
+
+        return Response({
+            "message": f"Initialized {created_count} leave balances for {month}/{year}"
+        })
+
+
+class MonthlyCreditView(APIView):
+    """Add monthly leave credit (5 days) + carry forward unused leaves"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from accounts.models import User
+
+        year = timezone.now().year
+        month = timezone.now().month
+        monthly_credit = 5  # 5 days per month
+
+        employees = User.objects.filter(role='employee', is_active=True)
+        leave_type = LeaveType.objects.filter(code='ML', is_active=True).first()
+
+        if not leave_type:
+            return Response(
+                {"error": "Monthly Leave (ML) type not found"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        results = []
+        for emp in employees:
+            balance, created = LeaveBalance.objects.get_or_create(
+                user=emp,
+                leave_type=leave_type,
+                year=year,
+                defaults={
+                    'total_leaves': monthly_credit,
+                    'used_leaves': 0,
+                    'carried_forward': 0
+                }
+            )
+
+            if not created:
+                # Calculate unused leaves from previous period
+                unused = float(balance.total_leaves) + float(balance.carried_forward) - float(balance.used_leaves)
+
+                # No max limit - all unused leaves carry forward within the year
+                carry_forward = max(0, unused)
+
+                # New month: add monthly credit + keep carry forward
+                balance.carried_forward = carry_forward
+                balance.total_leaves = monthly_credit
+                balance.used_leaves = 0
+                balance.save()
+
+            results.append({
+                'employee': emp.name,
+                'new_credit': monthly_credit,
+                'carry_forward': float(balance.carried_forward),
+                'total_available': float(balance.available_leaves)
+            })
+
+        return Response({
+            "message": f"Monthly credit added for {month}/{year}",
+            "results": results
+        })
+
+
+class NewYearResetView(APIView):
+    """Reset leave balances for new year - carry forward from previous year"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from accounts.models import User
+
+        new_year = request.data.get('year', timezone.now().year)
+        previous_year = new_year - 1
+
+        employees = User.objects.filter(role='employee', is_active=True)
+        leave_types = LeaveType.objects.filter(is_active=True)
+
+        if not leave_types.exists():
+            return Response(
+                {"error": "No active leave types found"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        results = []
+        for emp in employees:
+            emp_result = {'employee': emp.name, 'balances': []}
+
+            for leave_type in leave_types:
+                # Get previous year balance
+                prev_balance = LeaveBalance.objects.filter(
+                    user=emp,
+                    leave_type=leave_type,
+                    year=previous_year
+                ).first()
+
+                # Calculate carry forward from previous year (only if leave type allows)
+                carry_forward = 0
+                if prev_balance and leave_type.is_carry_forward:
+                    unused = float(prev_balance.total_leaves) + float(prev_balance.carried_forward) - float(prev_balance.used_leaves)
+                    carry_forward = min(max(0, unused), leave_type.max_carry_forward) if leave_type.max_carry_forward > 0 else max(0, unused)
+
+                # Create or update new year balance
+                new_balance, created = LeaveBalance.objects.get_or_create(
+                    user=emp,
+                    leave_type=leave_type,
+                    year=new_year,
+                    defaults={
+                        'total_leaves': leave_type.annual_quota,
+                        'used_leaves': 0,
+                        'carried_forward': carry_forward,
+                        'lop_days': 0
+                    }
+                )
+
+                if not created:
+                    new_balance.total_leaves = leave_type.annual_quota
+                    new_balance.used_leaves = 0
+                    new_balance.carried_forward = carry_forward
+                    new_balance.lop_days = 0
+                    new_balance.save()
+
+                emp_result['balances'].append({
+                    'leave_type': leave_type.name,
+                    'annual_quota': leave_type.annual_quota,
+                    'carry_forward': carry_forward,
+                    'total_available': float(new_balance.available_leaves)
+                })
+
+            results.append(emp_result)
+
+        return Response({
+            "message": f"New year {new_year} balances initialized for all employees",
+            "results": results
+        })
+
+
+class UpdateLeaveBalanceView(APIView):
+    """Admin can update employee's leave balance"""
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, pk):
+        try:
+            balance = LeaveBalance.objects.get(pk=pk)
+        except LeaveBalance.DoesNotExist:
+            return Response(
+                {"error": "Leave balance not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Update fields if provided
+        if 'total_leaves' in request.data:
+            balance.total_leaves = request.data['total_leaves']
+        if 'used_leaves' in request.data:
+            balance.used_leaves = request.data['used_leaves']
+        if 'carried_forward' in request.data:
+            balance.carried_forward = request.data['carried_forward']
+        if 'lop_days' in request.data:
+            balance.lop_days = request.data['lop_days']
+
+        balance.save()
+
+        return Response({
+            "message": "Leave balance updated successfully",
+            "data": LeaveBalanceSerializer(balance).data
+        })
+
+
+class UpdateLeaveRequestView(APIView):
+    """Admin can update leave request even after approval/rejection"""
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, pk):
+        print(f"[DEBUG] UpdateLeaveRequest called with pk={pk}")
+        print(f"[DEBUG] Request data: {request.data}")
+
+        try:
+            leave_request = LeaveRequest.objects.get(pk=pk)
+        except LeaveRequest.DoesNotExist:
+            return Response(
+                {"error": "Leave request not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        old_status = leave_request.status
+        old_paid_days = float(leave_request.paid_days)
+        old_lop_days = float(leave_request.lop_days)
+
+        print(f"[DEBUG] Before update - status: {old_status}, paid_days: {old_paid_days}, lop_days: {old_lop_days}")
+
+        # Update fields if provided
+        if 'status' in request.data:
+            leave_request.status = request.data['status']
+        if 'paid_days' in request.data:
+            leave_request.paid_days = request.data['paid_days']
+        if 'lop_days' in request.data:
+            leave_request.lop_days = request.data['lop_days']
+        if 'review_remarks' in request.data:
+            leave_request.review_remarks = request.data['review_remarks']
+
+        # If status changed, update reviewed info
+        if 'status' in request.data:
+            leave_request.reviewed_by = request.user
+            leave_request.reviewed_on = timezone.now()
+
+        print(f"[DEBUG] After field update - status: {leave_request.status}, paid_days: {leave_request.paid_days}, lop_days: {leave_request.lop_days}")
+
+        leave_request.save()
+
+        # Reload from database to verify save worked
+        leave_request.refresh_from_db()
+        print(f"[DEBUG] After save and refresh - status: {leave_request.status}, paid_days: {leave_request.paid_days}, lop_days: {leave_request.lop_days}")
+
+        # Update leave balance if needed
+        if old_status == 'approved' or leave_request.status == 'approved':
+            year = leave_request.start_date.year
+            month = leave_request.start_date.month
+            balance = LeaveBalance.objects.filter(
+                user=leave_request.user,
+                leave_type=leave_request.leave_type,
+                year=year,
+                month=month
+            ).first()
+
+            print(f"[DEBUG] Looking for balance with user={leave_request.user.id}, leave_type={leave_request.leave_type.id}, year={year}, month={month}")
+            print(f"[DEBUG] Balance found: {balance}")
+
+            if balance:
+                # Reverse old deduction if was approved
+                if old_status == 'approved':
+                    balance.used_leaves = float(balance.used_leaves) - old_paid_days
+                    balance.lop_days = float(balance.lop_days) - old_lop_days
+
+                # Apply new deduction if now approved
+                if leave_request.status == 'approved':
+                    balance.used_leaves = float(balance.used_leaves) + float(leave_request.paid_days)
+                    balance.lop_days = float(balance.lop_days) + float(leave_request.lop_days)
+
+                balance.save()
+
+        return Response({
+            "message": "Leave request updated successfully",
+            "data": LeaveRequestSerializer(leave_request).data
+        })
+
+
+class ExportLeaveReportCSVView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        year = request.query_params.get('year', timezone.now().year)
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="leave_report_{year}.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Employee Name', 'Leave Type', 'Total Leaves',
+            'Used Leaves', 'Available Leaves', 'LOP Days'
+        ])
+
+        balances = LeaveBalance.objects.filter(year=year).select_related(
+            'user', 'leave_type'
+        ).order_by('user__name', 'leave_type__code')
+
+        for bal in balances:
+            writer.writerow([
+                bal.user.name,
+                bal.leave_type.code,
+                bal.total_leaves,
+                bal.used_leaves,
+                bal.available_leaves,
+                bal.lop_days
+            ])
+
+        return response
+
+
+# Holiday views
+class HolidayListView(generics.ListCreateAPIView):
+    serializer_class = HolidaySerializer
+    queryset = Holiday.objects.all()
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+
+class HolidayDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = HolidaySerializer
+    queryset = Holiday.objects.all()
+
+
+class CheckTodayLeaveView(APIView):
+    """Check if user has approved leave for today"""
+
+    def get(self, request):
+        today = timezone.now().date()
+
+        # Find approved leave that includes today
+        leave_request = LeaveRequest.objects.filter(
+            user=request.user,
+            status='approved',
+            start_date__lte=today,
+            end_date__gte=today
+        ).select_related('leave_type').first()
+
+        if leave_request:
+            return Response({
+                'has_leave': True,
+                'leave_id': leave_request.id,
+                'leave_type': leave_request.leave_type.name,
+                'start_date': leave_request.start_date,
+                'end_date': leave_request.end_date,
+                'message': f'You have approved {leave_request.leave_type.name} from {leave_request.start_date} to {leave_request.end_date}'
+            })
+
+        return Response({
+            'has_leave': False,
+            'message': 'No approved leave for today'
+        })
+
+
+class CancelLeaveForDateView(APIView):
+    """Cancel leave for a specific date - handles splitting if needed"""
+
+    def post(self, request):
+        date_str = request.data.get('date')
+        if not date_str:
+            date_to_cancel = timezone.now().date()
+        else:
+            from datetime import datetime
+            date_to_cancel = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+        # Find approved leave that includes this date
+        leave_request = LeaveRequest.objects.filter(
+            user=request.user,
+            status='approved',
+            start_date__lte=date_to_cancel,
+            end_date__gte=date_to_cancel
+        ).select_related('leave_type').first()
+
+        if not leave_request:
+            return Response(
+                {"error": "No approved leave found for this date"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get leave balance to restore
+        year = leave_request.start_date.year
+        month = leave_request.start_date.month
+
+        balance = LeaveBalance.objects.filter(
+            user=request.user,
+            leave_type=leave_request.leave_type,
+            year=year,
+            month=month
+        ).first()
+
+        # Calculate days to restore (1 day or 0.5 for half day)
+        days_to_restore = 0.5 if leave_request.is_half_day else 1
+
+        # Handle different scenarios
+        if leave_request.start_date == leave_request.end_date:
+            # Single day leave - just cancel it
+            leave_request.status = 'cancelled'
+            leave_request.review_remarks = (leave_request.review_remarks or '') + f'\n[Auto-cancelled for {date_to_cancel} - Employee came to office]'
+            leave_request.save()
+
+            # Restore balance
+            if balance:
+                if leave_request.paid_days > 0:
+                    balance.used_leaves = max(0, float(balance.used_leaves) - float(leave_request.paid_days))
+                if leave_request.lop_days > 0:
+                    balance.lop_days = max(0, float(balance.lop_days) - float(leave_request.lop_days))
+                balance.save()
+
+            # Remove on_leave status from attendance
+            from attendance.models import Attendance
+            Attendance.objects.filter(
+                user=request.user,
+                date=date_to_cancel,
+                status='on_leave'
+            ).delete()
+
+        elif leave_request.start_date == date_to_cancel:
+            # Cancel first day - move start date forward
+            new_start = date_to_cancel + timezone.timedelta(days=1)
+            old_paid = float(leave_request.paid_days)
+            old_lop = float(leave_request.lop_days)
+
+            leave_request.start_date = new_start
+            # Recalculate days
+            total_days = (leave_request.end_date - new_start).days + 1
+            leave_request.paid_days = min(old_paid, total_days)
+            leave_request.lop_days = max(0, total_days - leave_request.paid_days)
+            leave_request.review_remarks = (leave_request.review_remarks or '') + f'\n[Start date changed from {date_to_cancel} - Employee came to office]'
+            leave_request.save()
+
+            # Restore 1 day to balance
+            if balance:
+                if old_paid > leave_request.paid_days:
+                    balance.used_leaves = max(0, float(balance.used_leaves) - (old_paid - float(leave_request.paid_days)))
+                if old_lop > leave_request.lop_days:
+                    balance.lop_days = max(0, float(balance.lop_days) - (old_lop - float(leave_request.lop_days)))
+                balance.save()
+
+            # Remove on_leave status
+            from attendance.models import Attendance
+            Attendance.objects.filter(
+                user=request.user,
+                date=date_to_cancel,
+                status='on_leave'
+            ).delete()
+
+        elif leave_request.end_date == date_to_cancel:
+            # Cancel last day - move end date backward
+            new_end = date_to_cancel - timezone.timedelta(days=1)
+            old_paid = float(leave_request.paid_days)
+            old_lop = float(leave_request.lop_days)
+
+            leave_request.end_date = new_end
+            # Recalculate days
+            total_days = (new_end - leave_request.start_date).days + 1
+            leave_request.paid_days = min(old_paid, total_days)
+            leave_request.lop_days = max(0, total_days - leave_request.paid_days)
+            leave_request.review_remarks = (leave_request.review_remarks or '') + f'\n[End date changed from {date_to_cancel} - Employee came to office]'
+            leave_request.save()
+
+            # Restore 1 day to balance
+            if balance:
+                if old_paid > leave_request.paid_days:
+                    balance.used_leaves = max(0, float(balance.used_leaves) - (old_paid - float(leave_request.paid_days)))
+                if old_lop > leave_request.lop_days:
+                    balance.lop_days = max(0, float(balance.lop_days) - (old_lop - float(leave_request.lop_days)))
+                balance.save()
+
+            # Remove on_leave status
+            from attendance.models import Attendance
+            Attendance.objects.filter(
+                user=request.user,
+                date=date_to_cancel,
+                status='on_leave'
+            ).delete()
+
+        else:
+            # Date is in the middle - need to split into two leave requests
+            original_end = leave_request.end_date
+            old_paid = float(leave_request.paid_days)
+            old_lop = float(leave_request.lop_days)
+            old_total = (original_end - leave_request.start_date).days + 1
+
+            # First part: start_date to (date_to_cancel - 1)
+            new_end_first = date_to_cancel - timezone.timedelta(days=1)
+            first_part_days = (new_end_first - leave_request.start_date).days + 1
+
+            leave_request.end_date = new_end_first
+            leave_request.paid_days = min(old_paid, first_part_days)
+            leave_request.lop_days = max(0, first_part_days - leave_request.paid_days)
+            leave_request.review_remarks = (leave_request.review_remarks or '') + f'\n[Split: Employee came to office on {date_to_cancel}]'
+            leave_request.save()
+
+            # Second part: (date_to_cancel + 1) to end_date
+            new_start_second = date_to_cancel + timezone.timedelta(days=1)
+            if new_start_second <= original_end:
+                second_part_days = (original_end - new_start_second).days + 1
+                remaining_paid = max(0, old_paid - first_part_days - 1)  # -1 for cancelled day
+                second_paid = min(remaining_paid, second_part_days)
+                second_lop = max(0, second_part_days - second_paid)
+
+                LeaveRequest.objects.create(
+                    user=request.user,
+                    leave_type=leave_request.leave_type,
+                    start_date=new_start_second,
+                    end_date=original_end,
+                    reason=leave_request.reason + f' [Split from original leave]',
+                    status='approved',
+                    reviewed_by=leave_request.reviewed_by,
+                    reviewed_on=timezone.now(),
+                    review_remarks=f'Auto-created from split leave. Original: {leave_request.start_date} to {original_end}',
+                    paid_days=second_paid,
+                    lop_days=second_lop,
+                    is_lop=second_lop > 0
+                )
+
+            # Restore 1 day to balance
+            if balance:
+                # Calculate how much was saved
+                new_total = first_part_days + (second_part_days if new_start_second <= original_end else 0)
+                days_saved = old_total - new_total
+
+                if old_paid > 0:
+                    paid_saved = min(days_saved, old_paid - float(leave_request.paid_days))
+                    balance.used_leaves = max(0, float(balance.used_leaves) - paid_saved)
+                balance.save()
+
+            # Remove on_leave status for the cancelled date
+            from attendance.models import Attendance
+            Attendance.objects.filter(
+                user=request.user,
+                date=date_to_cancel,
+                status='on_leave'
+            ).delete()
+
+        return Response({
+            "message": f"Leave cancelled for {date_to_cancel}. You can now punch in.",
+            "date": str(date_to_cancel)
+        })
