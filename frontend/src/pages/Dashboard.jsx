@@ -50,8 +50,9 @@ const Dashboard = () => {
           });
         }
         if (results[4]) {
-          // Get only recent 5 leave requests
-          setRecentLeaves(results[4].data.slice(0, 5));
+          // Get only recent 5 leave requests (handle paginated response)
+          const leaveData = results[4].data.results || results[4].data;
+          setRecentLeaves(Array.isArray(leaveData) ? leaveData.slice(0, 5) : []);
         }
       }
     } catch (error) {

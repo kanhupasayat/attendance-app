@@ -76,6 +76,16 @@ api.interceptors.response.use(
   }
 );
 
+// Helper to extract array from paginated response
+const extractData = (data) => {
+  // If it's a paginated response with 'results' key, return results
+  if (data && typeof data === 'object' && 'results' in data) {
+    return data.results;
+  }
+  // Otherwise return as-is (already an array or other format)
+  return data;
+};
+
 // Cached GET request helper
 const cachedGet = async (url, params = {}, cacheKey = null) => {
   const key = cacheKey || `${url}:${JSON.stringify(params)}`;
@@ -86,6 +96,12 @@ const cachedGet = async (url, params = {}, cacheKey = null) => {
   const response = await api.get(url, { params });
   setCache(key, response.data);
   return response;
+};
+
+// GET request that returns array (handles pagination)
+const getArray = async (url, params = {}) => {
+  const response = await api.get(url, { params });
+  return { ...response, data: extractData(response.data) };
 };
 
 // Auth APIs
@@ -103,7 +119,14 @@ export const authAPI = {
     });
   },
   changePassword: (data) => api.post('/auth/change-password/', data),
-  getEmployees: () => cachedGet('/auth/employees/', {}, 'employees'),
+  getEmployees: async () => {
+    const response = await cachedGet('/auth/employees/', {}, 'employees');
+    // Handle paginated response
+    if (response.data && response.data.results) {
+      return { ...response, data: response.data.results };
+    }
+    return response;
+  },
   createEmployee: (data) => {
     clearCache();
     return api.post('/auth/employees/', data);
@@ -119,7 +142,7 @@ export const authAPI = {
   getEmployee: (id) => api.get(`/auth/employees/${id}/`),
   getDashboardStats: () => cachedGet('/auth/dashboard-stats/', {}, 'dashboard-stats'),
   // Notifications
-  getNotifications: () => api.get('/auth/notifications/'),
+  getNotifications: () => getArray('/auth/notifications/'),
   getUnreadCount: () => api.get('/auth/notifications/unread-count/'),
   markNotificationRead: (id) => api.post(`/auth/notifications/read/${id}/`),
   markAllNotificationsRead: () => api.post('/auth/notifications/read-all/'),
@@ -128,10 +151,10 @@ export const authAPI = {
   submitProfileUpdateRequest: (data) => api.post('/auth/profile/update-request/', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getMyProfileRequests: () => api.get('/auth/profile/my-requests/'),
+  getMyProfileRequests: () => getArray('/auth/profile/my-requests/'),
   cancelProfileRequest: (id) => api.post(`/auth/profile/cancel-request/${id}/`),
   // Admin - Profile Update Requests
-  getAllProfileRequests: (params) => api.get('/auth/profile/all-requests/', { params }),
+  getAllProfileRequests: (params) => getArray('/auth/profile/all-requests/', params),
   reviewProfileRequest: (id, data) => api.post(`/auth/profile/review/${id}/`, data),
 };
 
@@ -147,7 +170,7 @@ export const attendanceAPI = {
   },
   getToday: () => api.get('/attendance/today/'),
   getMyAttendance: (params) => cachedGet('/attendance/my-attendance/', params),
-  getAllAttendance: (params) => api.get('/attendance/all/', { params }),
+  getAllAttendance: (params) => getArray('/attendance/all/', params),
   getReport: (params) => api.get('/attendance/report/', { params }),
   exportCSV: (params) => api.get('/attendance/export/', { params, responseType: 'blob' }),
   getOffDayStats: (params) => cachedGet('/attendance/off-day-stats/', params),
@@ -166,14 +189,14 @@ export const attendanceAPI = {
   },
   // Regularization
   applyRegularization: (data) => api.post('/attendance/regularization/apply/', data),
-  getMyRegularizations: () => api.get('/attendance/regularization/my-requests/'),
-  getAllRegularizations: (params) => api.get('/attendance/regularization/all/', { params }),
+  getMyRegularizations: () => getArray('/attendance/regularization/my-requests/'),
+  getAllRegularizations: (params) => getArray('/attendance/regularization/all/', params),
   reviewRegularization: (id, data) => api.post(`/attendance/regularization/review/${id}/`, data),
   cancelRegularization: (id) => api.post(`/attendance/regularization/cancel/${id}/`),
   // WFH (Work From Home)
   applyWFH: (data) => api.post('/attendance/wfh/apply/', data),
-  getMyWFH: () => api.get('/attendance/wfh/my-requests/'),
-  getAllWFH: (params) => api.get('/attendance/wfh/all/', { params }),
+  getMyWFH: () => getArray('/attendance/wfh/my-requests/'),
+  getAllWFH: (params) => getArray('/attendance/wfh/all/', params),
   reviewWFH: (id, data) => api.post(`/attendance/wfh/review/${id}/`, data),
   cancelWFH: (id) => api.post(`/attendance/wfh/cancel/${id}/`),
   getTodayWFHStatus: () => api.get('/attendance/wfh/today-status/'),
@@ -213,8 +236,8 @@ export const attendanceAPI = {
     return api.post('/attendance/shifts/assign/', data);
   },
   // Comp Off
-  getMyCompOffs: () => api.get('/attendance/comp-off/my/'),
-  getAllCompOffs: (params) => api.get('/attendance/comp-off/all/', { params }),
+  getMyCompOffs: () => getArray('/attendance/comp-off/my/'),
+  getAllCompOffs: (params) => getArray('/attendance/comp-off/all/', params),
   getCompOffBalance: (params) => api.get('/attendance/comp-off/balance/', { params }),
   useCompOff: (data) => {
     clearCache();
@@ -238,18 +261,18 @@ export const leaveAPI = {
     clearCache();
     return api.post('/leaves/apply/', data);
   },
-  getMyRequests: () => api.get('/leaves/my-requests/'),
+  getMyRequests: () => getArray('/leaves/my-requests/'),
   cancelRequest: (id) => {
     clearCache();
     return api.post(`/leaves/cancel/${id}/`);
   },
-  getAllRequests: (params) => api.get('/leaves/all-requests/', { params }),
+  getAllRequests: (params) => getArray('/leaves/all-requests/', params),
   reviewRequest: (id, data) => {
     clearCache();
     return api.post(`/leaves/review/${id}/`, data);
   },
   updateRequest: (id, data) => api.patch(`/leaves/update-request/${id}/`, data),
-  getAllBalances: (params) => api.get('/leaves/all-balances/', { params }),
+  getAllBalances: (params) => getArray('/leaves/all-balances/', params),
   updateBalance: (id, data) => api.patch(`/leaves/update-balance/${id}/`, data),
   initializeBalances: (data) => api.post('/leaves/initialize/', data),
   monthlyCredit: () => api.post('/leaves/monthly-credit/'),
