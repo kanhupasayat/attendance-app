@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest
+from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest, Shift, CompOff
 from accounts.serializers import UserSerializer
 
 
@@ -138,3 +138,63 @@ class AdminAttendanceUpdateSerializer(serializers.Serializer):
         required=False
     )
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+# Shift Serializers
+class ShiftSerializer(serializers.ModelSerializer):
+    total_hours = serializers.SerializerMethodField()
+    employee_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Shift
+        fields = [
+            'id', 'name', 'start_time', 'end_time',
+            'break_start', 'break_end', 'break_duration_hours',
+            'grace_period_minutes', 'is_active', 'total_hours',
+            'employee_count', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_total_hours(self, obj):
+        return obj.get_total_hours()
+
+    def get_employee_count(self, obj):
+        return obj.employees.filter(is_active=True).count()
+
+
+class ShiftCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shift
+        fields = [
+            'name', 'start_time', 'end_time',
+            'break_start', 'break_end', 'break_duration_hours',
+            'grace_period_minutes', 'is_active'
+        ]
+
+
+# Comp Off Serializers
+class CompOffSerializer(serializers.ModelSerializer):
+    user_details = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CompOff
+        fields = [
+            'id', 'user', 'user_details', 'earned_date', 'earned_hours',
+            'credit_days', 'reason', 'status', 'used_date', 'expires_on',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_user_details(self, obj):
+        return {
+            'id': obj.user.id,
+            'name': obj.user.name,
+            'mobile': obj.user.mobile,
+            'department': obj.user.department
+        }
+
+
+class CompOffUseSerializer(serializers.Serializer):
+    """Serializer for using comp off as leave"""
+    comp_off_id = serializers.IntegerField()
+    use_date = serializers.DateField()

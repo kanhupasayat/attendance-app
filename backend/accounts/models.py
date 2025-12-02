@@ -49,6 +49,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     department = models.CharField(max_length=100, blank=True)
     designation = models.CharField(max_length=100, blank=True)
     weekly_off = models.IntegerField(choices=WEEKDAY_CHOICES, default=6, help_text="Weekly off day (0=Monday, 6=Sunday)")
+    shift = models.ForeignKey(
+        'attendance.Shift',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='employees',
+        help_text="Employee's assigned shift"
+    )
     date_joined = models.DateTimeField(default=timezone.now)
 
     # Father's Contact

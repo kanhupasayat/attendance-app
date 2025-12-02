@@ -6,12 +6,14 @@ from .models import User, OTP, Notification, ProfileUpdateRequest
 class UserSerializer(serializers.ModelSerializer):
     weekly_off_display = serializers.SerializerMethodField()
     photo_url = serializers.SerializerMethodField()
+    shift_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'mobile', 'email', 'name', 'role',
             'department', 'designation', 'weekly_off', 'weekly_off_display',
+            'shift', 'shift_name',
             'date_joined', 'is_active', 'is_admin', 'photo_url'
         ]
         read_only_fields = ['id', 'date_joined']
@@ -26,6 +28,9 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.photo.url
         return None
 
+    def get_shift_name(self, obj):
+        return obj.shift.name if obj.shift else None
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """Full profile serializer with all details"""
@@ -34,12 +39,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
     aadhaar_photo_url = serializers.SerializerMethodField()
     pan_photo_url = serializers.SerializerMethodField()
     has_pending_update = serializers.SerializerMethodField()
+    shift_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'mobile', 'email', 'name', 'photo', 'photo_url', 'role',
             'department', 'designation', 'weekly_off', 'weekly_off_display',
+            'shift', 'shift_name',
             'date_joined', 'is_active', 'is_admin',
             # Family
             'father_name', 'father_phone',
@@ -78,6 +85,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_has_pending_update(self, obj):
         return ProfileUpdateRequest.objects.filter(user=obj, status='pending').exists()
+
+    def get_shift_name(self, obj):
+        return obj.shift.name if obj.shift else None
 
     def validate_photo(self, value):
         """Compress profile photo on upload"""

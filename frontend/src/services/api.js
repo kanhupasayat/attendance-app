@@ -194,6 +194,36 @@ export const attendanceAPI = {
     clearCache();
     return api.post('/attendance/admin/bulk-update/', data);
   },
+  // Shift Management (Admin)
+  getShifts: () => cachedGet('/attendance/shifts/', {}, 'shifts'),
+  createShift: (data) => {
+    clearCache();
+    return api.post('/attendance/shifts/', data);
+  },
+  updateShift: (id, data) => {
+    clearCache();
+    return api.patch(`/attendance/shifts/${id}/`, data);
+  },
+  deleteShift: (id) => {
+    clearCache();
+    return api.delete(`/attendance/shifts/${id}/`);
+  },
+  assignShift: (data) => {
+    clearCache();
+    return api.post('/attendance/shifts/assign/', data);
+  },
+  // Comp Off
+  getMyCompOffs: () => api.get('/attendance/comp-off/my/'),
+  getAllCompOffs: (params) => api.get('/attendance/comp-off/all/', { params }),
+  getCompOffBalance: (params) => api.get('/attendance/comp-off/balance/', { params }),
+  useCompOff: (data) => {
+    clearCache();
+    return api.post('/attendance/comp-off/use/', data);
+  },
+  adminCreateCompOff: (data) => {
+    clearCache();
+    return api.post('/attendance/comp-off/admin/create/', data);
+  },
 };
 
 // Leave APIs

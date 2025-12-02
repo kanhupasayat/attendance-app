@@ -7,14 +7,15 @@ from datetime import datetime, timedelta
 import csv
 from django.http import HttpResponse
 
-from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest
+from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest, Shift, CompOff
 from .serializers import (
     AttendanceSerializer, PunchInSerializer, PunchOutSerializer,
     OfficeLocationSerializer, AttendanceReportSerializer,
     RegularizationRequestSerializer, RegularizationApplySerializer,
     RegularizationReviewSerializer, WFHRequestSerializer,
     WFHApplySerializer, WFHReviewSerializer,
-    AdminAttendanceCreateSerializer, AdminAttendanceUpdateSerializer
+    AdminAttendanceCreateSerializer, AdminAttendanceUpdateSerializer,
+    ShiftSerializer, ShiftCreateSerializer, CompOffSerializer, CompOffUseSerializer
 )
 from .utils import validate_location, validate_ip, get_client_ip
 from accounts.views import IsAdminUser
@@ -981,3 +982,235 @@ class AdminBulkAttendanceView(APIView):
             "message": f"Bulk attendance update completed for {date}",
             "results": results
         })
+
+
+# Shift Management Views
+class ShiftListCreateView(generics.ListCreateAPIView):
+    """List all shifts or create a new shift (Admin only)"""
+    permission_classes = [IsAdminUser]
+    queryset = Shift.objects.all()
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return ShiftCreateSerializer
+        return ShiftSerializer
+
+
+class ShiftDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Get, update or delete a shift (Admin only)"""
+    permission_classes = [IsAdminUser]
+    serializer_class = ShiftSerializer
+    queryset = Shift.objects.all()
+
+
+class AssignShiftView(APIView):
+    """Assign shift to employee(s)"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from accounts.models import User
+
+        shift_id = request.data.get('shift_id')
+        user_ids = request.data.get('user_ids', [])
+
+        if not user_ids:
+            return Response(
+                {"error": "user_ids is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # shift_id can be null to remove shift
+        shift = None
+        if shift_id:
+            try:
+                shift = Shift.objects.get(pk=shift_id, is_active=True)
+            except Shift.DoesNotExist:
+                return Response(
+                    {"error": "Shift not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        updated_count = User.objects.filter(
+            pk__in=user_ids,
+            role='employee'
+        ).update(shift=shift)
+
+        shift_name = shift.name if shift else "No Shift"
+        return Response({
+            "message": f"Shift '{shift_name}' assigned to {updated_count} employee(s)",
+            "updated_count": updated_count
+        })
+
+
+# Comp Off Views
+class MyCompOffListView(generics.ListAPIView):
+    """List current user's comp offs"""
+    serializer_class = CompOffSerializer
+
+    def get_queryset(self):
+        return CompOff.objects.filter(user=self.request.user)
+
+
+class AllCompOffListView(generics.ListAPIView):
+    """List all comp offs (Admin only)"""
+    permission_classes = [IsAdminUser]
+    serializer_class = CompOffSerializer
+
+    def get_queryset(self):
+        queryset = CompOff.objects.all()
+        status_filter = self.request.query_params.get('status', '')
+        user_id = self.request.query_params.get('user_id', '')
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        return queryset
+
+
+class CompOffBalanceView(APIView):
+    """Get comp off balance for current user or specific user"""
+
+    def get(self, request):
+        user_id = request.query_params.get('user_id')
+
+        if user_id and request.user.is_admin:
+            from accounts.models import User
+            try:
+                user = User.objects.get(pk=user_id)
+            except User.DoesNotExist:
+                return Response(
+                    {"error": "User not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            user = request.user
+
+        # Calculate balances
+        earned = CompOff.objects.filter(user=user, status='earned').aggregate(
+            total=Sum('credit_days')
+        )['total'] or 0
+
+        used = CompOff.objects.filter(user=user, status='used').aggregate(
+            total=Sum('credit_days')
+        )['total'] or 0
+
+        expired = CompOff.objects.filter(user=user, status='expired').aggregate(
+            total=Sum('credit_days')
+        )['total'] or 0
+
+        # Check and mark expired comp offs
+        today = timezone.now().date()
+        CompOff.objects.filter(
+            user=user,
+            status='earned',
+            expires_on__lt=today
+        ).update(status='expired')
+
+        return Response({
+            "user_id": user.id,
+            "user_name": user.name,
+            "earned": float(earned),
+            "used": float(used),
+            "expired": float(expired),
+            "available": float(earned - used)
+        })
+
+
+class UseCompOffView(APIView):
+    """Use comp off as leave"""
+
+    def post(self, request):
+        serializer = CompOffUseSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        comp_off_id = serializer.validated_data['comp_off_id']
+        use_date = serializer.validated_data['use_date']
+
+        try:
+            comp_off = CompOff.objects.get(
+                pk=comp_off_id,
+                user=request.user,
+                status='earned'
+            )
+        except CompOff.DoesNotExist:
+            return Response(
+                {"error": "Comp off not found or already used"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if expired
+        if comp_off.expires_on and use_date > comp_off.expires_on:
+            return Response(
+                {"error": "Comp off has expired"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mark comp off as used
+        comp_off.status = 'used'
+        comp_off.used_date = use_date
+        comp_off.save()
+
+        # Create attendance record for the comp off day
+        attendance, created = Attendance.objects.update_or_create(
+            user=request.user,
+            date=use_date,
+            defaults={
+                'status': 'on_leave',
+                'notes': f"Comp Off used (earned on {comp_off.earned_date})"
+            }
+        )
+
+        return Response({
+            "message": f"Comp off used successfully for {use_date}",
+            "comp_off": CompOffSerializer(comp_off).data
+        })
+
+
+class AdminCreateCompOffView(APIView):
+    """Admin can manually create comp off for employee"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from accounts.models import User
+
+        user_id = request.data.get('user_id')
+        earned_date = request.data.get('earned_date')
+        credit_days = request.data.get('credit_days', 1.0)
+        reason = request.data.get('reason', 'Manual credit by admin')
+
+        if not user_id or not earned_date:
+            return Response(
+                {"error": "user_id and earned_date are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(pk=user_id, role='employee')
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Employee not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            earned_date = datetime.strptime(earned_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        comp_off = CompOff.objects.create(
+            user=user,
+            earned_date=earned_date,
+            credit_days=credit_days,
+            reason=reason
+        )
+
+        return Response({
+            "message": f"Comp off credited to {user.name}",
+            "comp_off": CompOffSerializer(comp_off).data
+        }, status=status.HTTP_201_CREATED)

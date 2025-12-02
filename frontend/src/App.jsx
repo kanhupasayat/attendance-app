@@ -29,6 +29,8 @@ const Regularization = lazy(() => import('./pages/Regularization'));
 const ProfileRequests = lazy(() => import('./pages/ProfileRequests'));
 const WFH = lazy(() => import('./pages/WFH'));
 const EmployeeProfile = lazy(() => import('./pages/EmployeeProfile'));
+const Shifts = lazy(() => import('./pages/Shifts'));
+const CompOff = lazy(() => import('./pages/CompOff'));
 
 function App() {
   return (
@@ -137,6 +139,22 @@ function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <ProfileRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shifts"
+              element={
+                <ProtectedRoute adminOnly>
+                  <Shifts />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/comp-off"
+              element={
+                <ProtectedRoute>
+                  <CompOff />
                 </ProtectedRoute>
               }
             />

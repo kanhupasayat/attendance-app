@@ -8,7 +8,10 @@ from .views import (
     WFHApplyView, MyWFHListView, AllWFHListView, WFHReviewView,
     CancelWFHView, TodayWFHStatusView, AutoPunchOutView,
     AdminAttendanceCreateView, AdminAttendanceUpdateView,
-    AdminMarkAbsentView, AdminBulkAttendanceView
+    AdminMarkAbsentView, AdminBulkAttendanceView,
+    ShiftListCreateView, ShiftDetailView, AssignShiftView,
+    MyCompOffListView, AllCompOffListView, CompOffBalanceView,
+    UseCompOffView, AdminCreateCompOffView
 )
 
 urlpatterns = [
@@ -51,4 +54,16 @@ urlpatterns = [
     path('admin/update/<int:pk>/', AdminAttendanceUpdateView.as_view(), name='admin-attendance-update'),
     path('admin/mark-absent/', AdminMarkAbsentView.as_view(), name='admin-mark-absent'),
     path('admin/bulk-update/', AdminBulkAttendanceView.as_view(), name='admin-bulk-attendance'),
+
+    # Shift management (Admin)
+    path('shifts/', ShiftListCreateView.as_view(), name='shift-list-create'),
+    path('shifts/<int:pk>/', ShiftDetailView.as_view(), name='shift-detail'),
+    path('shifts/assign/', AssignShiftView.as_view(), name='assign-shift'),
+
+    # Comp Off
+    path('comp-off/my/', MyCompOffListView.as_view(), name='my-comp-off'),
+    path('comp-off/all/', AllCompOffListView.as_view(), name='all-comp-off'),
+    path('comp-off/balance/', CompOffBalanceView.as_view(), name='comp-off-balance'),
+    path('comp-off/use/', UseCompOffView.as_view(), name='use-comp-off'),
+    path('comp-off/admin/create/', AdminCreateCompOffView.as_view(), name='admin-create-comp-off'),
 ]
