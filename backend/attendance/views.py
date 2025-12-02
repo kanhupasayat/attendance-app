@@ -1475,3 +1475,161 @@ class AdminCreateCompOffView(APIView):
             "message": f"Comp off credited to {user.name}",
             "comp_off": CompOffSerializer(comp_off).data
         }, status=status.HTTP_201_CREATED)
+
+
+class UseCompOffToReduceLOPView(APIView):
+    """Use Comp Off to reduce existing LOP days"""
+
+    def get(self, request):
+        """Get LOP details that can be reduced"""
+        from leaves.models import LeaveBalance, LeaveRequest
+
+        user = request.user
+        today = get_india_date()
+
+        # Get available comp offs
+        available_comp_offs = CompOff.objects.filter(
+            user=user,
+            status='earned',
+            expires_on__gte=today
+        ).order_by('expires_on')
+
+        available_comp_off_days = sum(co.credit_days for co in available_comp_offs)
+
+        # Get LOP from approved leave requests (current month and previous)
+        lop_leaves = LeaveRequest.objects.filter(
+            user=user,
+            status='approved',
+            lop_days__gt=0
+        ).order_by('-start_date')[:10]  # Last 10 LOP leaves
+
+        lop_details = [{
+            'id': leave.id,
+            'start_date': leave.start_date,
+            'end_date': leave.end_date,
+            'total_days': float(leave.total_days),
+            'lop_days': float(leave.lop_days),
+            'paid_days': float(leave.paid_days),
+            'comp_off_days': float(leave.comp_off_days),
+            'leave_type': leave.leave_type.name if leave.leave_type else 'LOP',
+            'reason': leave.reason
+        } for leave in lop_leaves]
+
+        # Format available comp offs for frontend
+        available_comp_off_list = [{
+            'id': co.id,
+            'earned_date': co.earned_date,
+            'credit_days': float(co.credit_days),
+            'reason': co.reason,
+            'expires_on': co.expires_on
+        } for co in available_comp_offs]
+
+        return Response({
+            'available_comp_off_days': float(available_comp_off_days),
+            'available_comp_offs': available_comp_off_list,
+            'lop_leaves': lop_details
+        })
+
+    def post(self, request):
+        """Use comp off to reduce LOP"""
+        from leaves.models import LeaveRequest
+        from accounts.models import Notification
+
+        leave_request_id = request.data.get('leave_request_id')
+        comp_off_id = request.data.get('comp_off_id')
+
+        if not leave_request_id:
+            return Response(
+                {"error": "leave_request_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not comp_off_id:
+            return Response(
+                {"error": "comp_off_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get the leave request with LOP
+        try:
+            leave_request = LeaveRequest.objects.get(
+                pk=leave_request_id,
+                user=request.user,
+                status='approved',
+                lop_days__gt=0
+            )
+        except LeaveRequest.DoesNotExist:
+            return Response(
+                {"error": "Leave request not found or has no LOP"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        today = get_india_date()
+
+        # Get the selected comp off
+        try:
+            comp_off = CompOff.objects.get(
+                pk=comp_off_id,
+                user=request.user,
+                status='earned',
+                expires_on__gte=today
+            )
+        except CompOff.DoesNotExist:
+            return Response(
+                {"error": "Comp off not found or already used/expired"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        days_to_reduce = float(comp_off.credit_days)
+
+        # Check if days_to_reduce is valid - can only reduce up to available LOP
+        actual_reduction = min(days_to_reduce, float(leave_request.lop_days))
+
+        if actual_reduction < days_to_reduce:
+            # Partial use - we'll use only what's needed
+            remaining_days = days_to_reduce - actual_reduction
+
+            # Mark original as used with reduced days
+            comp_off.credit_days = actual_reduction
+            comp_off.status = 'used'
+            comp_off.used_on = today
+            comp_off.save()
+
+            # Create new comp off for remaining days
+            CompOff.objects.create(
+                user=request.user,
+                earned_date=comp_off.earned_date,
+                credit_days=remaining_days,
+                status='earned',
+                reason=f"Remaining after LOP reduction on {today}",
+                expires_on=comp_off.expires_on
+            )
+        else:
+            # Use entire comp off
+            comp_off.status = 'used'
+            comp_off.used_on = today
+            comp_off.save()
+
+        # Update leave request - reduce LOP, increase comp_off_days
+        old_lop = leave_request.lop_days
+        leave_request.lop_days = float(leave_request.lop_days) - actual_reduction
+        leave_request.comp_off_days = float(leave_request.comp_off_days) + actual_reduction
+        leave_request.save()
+
+        # Create notification
+        Notification.objects.create(
+            user=request.user,
+            title="LOP Reduced",
+            message=f"Used {actual_reduction} Comp Off day(s) to reduce LOP. LOP reduced from {old_lop} to {leave_request.lop_days} days.",
+            notification_type='leave_approved'
+        )
+
+        return Response({
+            "message": f"Successfully reduced {actual_reduction} LOP day(s) using Comp Off",
+            "leave_request": {
+                "id": leave_request.id,
+                "old_lop_days": float(old_lop),
+                "new_lop_days": float(leave_request.lop_days),
+                "comp_off_days_used": actual_reduction
+            }
+        })

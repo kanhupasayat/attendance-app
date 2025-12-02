@@ -242,6 +242,12 @@ export const attendanceAPI = {
     clearCache();
     return api.post('/attendance/comp-off/admin/create/', data);
   },
+  // Reduce LOP using Comp Off
+  getReduceLOPOptions: () => api.get('/attendance/comp-off/reduce-lop/'),
+  useCompOffToReduceLOP: (data) => {
+    clearCache();
+    return api.post('/attendance/comp-off/reduce-lop/', data);
+  },
 };
 
 // Leave APIs

@@ -11,7 +11,7 @@ from .views import (
     AdminMarkAbsentView, AdminBulkAttendanceView,
     ShiftListCreateView, ShiftDetailView, AssignShiftView,
     MyCompOffListView, AllCompOffListView, CompOffBalanceView,
-    UseCompOffView, AdminCreateCompOffView
+    UseCompOffView, AdminCreateCompOffView, UseCompOffToReduceLOPView
 )
 
 urlpatterns = [
@@ -66,4 +66,5 @@ urlpatterns = [
     path('comp-off/balance/', CompOffBalanceView.as_view(), name='comp-off-balance'),
     path('comp-off/use/', UseCompOffView.as_view(), name='use-comp-off'),
     path('comp-off/admin/create/', AdminCreateCompOffView.as_view(), name='admin-create-comp-off'),
+    path('comp-off/reduce-lop/', UseCompOffToReduceLOPView.as_view(), name='comp-off-reduce-lop'),
 ]
