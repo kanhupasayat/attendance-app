@@ -41,13 +41,23 @@ class MyLeaveBalanceView(APIView):
         balances = []
 
         for lt in leave_types:
+            # Set monthly quota based on leave type
+            # Sick Leave (SL) = 1 per month
+            # Others = 5 per month (or use annual_quota / 12)
+            if lt.code == 'SL':
+                monthly_quota = 1
+            elif lt.code == 'LOP':
+                monthly_quota = 0
+            else:
+                monthly_quota = 5
+
             balance, created = LeaveBalance.objects.get_or_create(
                 user=request.user,
                 leave_type=lt,
                 year=year,
                 month=month,
                 defaults={
-                    'total_leaves': 5,
+                    'total_leaves': monthly_quota,
                     'used_leaves': 0,
                     'carried_forward': 0,
                     'lop_days': 0
@@ -136,6 +146,14 @@ class LeaveApplyView(APIView):
         year = start_date.year
         month = start_date.month
 
+        # Set monthly quota based on leave type
+        if leave_type.code == 'SL':
+            monthly_quota = 1
+        elif leave_type.code == 'LOP':
+            monthly_quota = 0
+        else:
+            monthly_quota = 5
+
         # Get or create balance for this month
         balance, created = LeaveBalance.objects.get_or_create(
             user=request.user,
@@ -143,7 +161,7 @@ class LeaveApplyView(APIView):
             year=year,
             month=month,
             defaults={
-                'total_leaves': 5,
+                'total_leaves': monthly_quota,
                 'used_leaves': 0,
                 'carried_forward': 0,
                 'lop_days': 0
