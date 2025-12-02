@@ -407,7 +407,14 @@ class MyAttendanceListView(generics.ListAPIView):
     serializer_class = AttendanceSerializer
 
     def get_queryset(self):
-        queryset = Attendance.objects.filter(user=self.request.user)
+        queryset = Attendance.objects.filter(
+            user=self.request.user
+        ).select_related('user').only(
+            'id', 'user_id', 'date', 'punch_in', 'punch_out',
+            'status', 'working_hours', 'is_off_day', 'is_wfh',
+            'is_auto_punch_out', 'notes', 'created_at',
+            'user__id', 'user__name', 'user__mobile', 'user__department'
+        )
 
         # Filter by date range
         start_date = self.request.query_params.get('start_date')
@@ -431,7 +438,12 @@ class AllAttendanceListView(generics.ListAPIView):
     serializer_class = AttendanceSerializer
 
     def get_queryset(self):
-        queryset = Attendance.objects.all()
+        queryset = Attendance.objects.select_related('user').only(
+            'id', 'user_id', 'date', 'punch_in', 'punch_out',
+            'status', 'working_hours', 'is_off_day', 'is_wfh',
+            'is_auto_punch_out', 'notes', 'created_at',
+            'user__id', 'user__name', 'user__mobile', 'user__department'
+        )
 
         user_id = self.request.query_params.get('user_id')
         start_date = self.request.query_params.get('start_date')
@@ -457,31 +469,51 @@ class AttendanceReportView(APIView):
         year = request.query_params.get('year', timezone.now().year)
 
         from accounts.models import User
-        employees = User.objects.filter(role='employee', is_active=True)
+        from django.db.models import Value
+        from django.db.models.functions import Coalesce
 
-        report = []
-        for emp in employees:
-            attendance_data = Attendance.objects.filter(
-                user=emp, date__month=month, date__year=year
-            ).aggregate(
-                total_present=Count('id', filter=Q(status='present')),
-                total_absent=Count('id', filter=Q(status='absent')),
-                total_half_day=Count('id', filter=Q(status='half_day')),
-                total_on_leave=Count('id', filter=Q(status='on_leave')),
-                total_working_hours=Sum('working_hours')
+        # Single optimized query with annotation - eliminates N+1 problem
+        report = User.objects.filter(
+            role='employee', is_active=True
+        ).annotate(
+            total_present=Count(
+                'attendance',
+                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='present')
+            ),
+            total_absent=Count(
+                'attendance',
+                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='absent')
+            ),
+            total_half_day=Count(
+                'attendance',
+                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='half_day')
+            ),
+            total_on_leave=Count(
+                'attendance',
+                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='on_leave')
+            ),
+            total_working_hours=Coalesce(
+                Sum('attendance__working_hours',
+                    filter=Q(attendance__date__month=month, attendance__date__year=year)),
+                Value(0)
             )
+        ).values(
+            'id', 'name', 'total_present', 'total_absent',
+            'total_half_day', 'total_on_leave', 'total_working_hours'
+        ).order_by('name')
 
-            report.append({
-                'user_id': emp.id,
-                'user_name': emp.name,
-                'total_present': attendance_data['total_present'] or 0,
-                'total_absent': attendance_data['total_absent'] or 0,
-                'total_half_day': attendance_data['total_half_day'] or 0,
-                'total_on_leave': attendance_data['total_on_leave'] or 0,
-                'total_working_hours': attendance_data['total_working_hours'] or 0
-            })
+        # Format response
+        result = [{
+            'user_id': emp['id'],
+            'user_name': emp['name'],
+            'total_present': emp['total_present'],
+            'total_absent': emp['total_absent'],
+            'total_half_day': emp['total_half_day'],
+            'total_on_leave': emp['total_on_leave'],
+            'total_working_hours': emp['total_working_hours']
+        } for emp in report]
 
-        return Response(report)
+        return Response(result)
 
 
 class ExportAttendanceCSVView(APIView):

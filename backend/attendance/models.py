@@ -85,6 +85,11 @@ class CompOff(models.Model):
     class Meta:
         db_table = 'comp_offs'
         ordering = ['-earned_date']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['user', 'earned_date']),
+            models.Index(fields=['status', 'expires_on']),
+        ]
 
     def save(self, *args, **kwargs):
         # Set expiry date (90 days from earned date by default)
@@ -141,6 +146,11 @@ class Attendance(models.Model):
         db_table = 'attendance'
         unique_together = ('user', 'date')
         ordering = ['-date', '-punch_in']
+        indexes = [
+            models.Index(fields=['user', 'date']),
+            models.Index(fields=['date', 'status']),
+            models.Index(fields=['user', 'status', 'date']),
+        ]
 
     def get_user_shift(self):
         """Get user's assigned shift or return default values"""

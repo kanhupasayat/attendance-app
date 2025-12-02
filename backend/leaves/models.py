@@ -42,6 +42,10 @@ class LeaveBalance(models.Model):
     class Meta:
         db_table = 'leave_balances'
         unique_together = ('user', 'leave_type', 'year', 'month')
+        indexes = [
+            models.Index(fields=['user', 'year', 'month']),
+            models.Index(fields=['user', 'leave_type', 'year']),
+        ]
 
     @property
     def available_leaves(self):
@@ -100,6 +104,11 @@ class LeaveRequest(models.Model):
     class Meta:
         db_table = 'leave_requests'
         ordering = ['-applied_on']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['user', 'start_date', 'end_date']),
+            models.Index(fields=['status', 'start_date']),
+        ]
 
     def calculate_total_days(self):
         if self.is_half_day:

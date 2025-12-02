@@ -1,6 +1,21 @@
 from rest_framework import serializers
 from .models import LeaveType, LeaveBalance, LeaveRequest, Holiday
-from accounts.serializers import UserSerializer
+
+
+# Lightweight serializers for nested objects - reduces data transfer
+class UserLightSerializer(serializers.Serializer):
+    """Lightweight user serializer - only essential fields"""
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    mobile = serializers.CharField()
+    department = serializers.CharField()
+
+
+class LeaveTypeLightSerializer(serializers.Serializer):
+    """Lightweight leave type serializer"""
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    code = serializers.CharField()
 
 
 class LeaveTypeSerializer(serializers.ModelSerializer):
@@ -15,8 +30,8 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
 
 
 class LeaveBalanceSerializer(serializers.ModelSerializer):
-    user_details = UserSerializer(source='user', read_only=True)
-    leave_type_details = LeaveTypeSerializer(source='leave_type', read_only=True)
+    user_details = UserLightSerializer(source='user', read_only=True)
+    leave_type_details = LeaveTypeLightSerializer(source='leave_type', read_only=True)
     available_leaves = serializers.DecimalField(
         max_digits=5, decimal_places=1, read_only=True
     )
@@ -39,9 +54,9 @@ class LeaveBalanceSerializer(serializers.ModelSerializer):
 
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
-    user_details = UserSerializer(source='user', read_only=True)
-    leave_type_details = LeaveTypeSerializer(source='leave_type', read_only=True)
-    reviewed_by_details = UserSerializer(source='reviewed_by', read_only=True)
+    user_details = UserLightSerializer(source='user', read_only=True)
+    leave_type_details = LeaveTypeLightSerializer(source='leave_type', read_only=True)
+    reviewed_by_details = UserLightSerializer(source='reviewed_by', read_only=True)
 
     class Meta:
         model = LeaveRequest

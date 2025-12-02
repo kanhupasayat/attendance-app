@@ -1,10 +1,34 @@
 from rest_framework import serializers
 from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest, Shift, CompOff
-from accounts.serializers import UserSerializer
+
+
+# Lightweight user serializer for list views - reduces data transfer
+class UserLightSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    mobile = serializers.CharField()
+    department = serializers.CharField()
 
 
 class AttendanceSerializer(serializers.ModelSerializer):
-    user_details = UserSerializer(source='user', read_only=True)
+    user_details = UserLightSerializer(source='user', read_only=True)
+
+    class Meta:
+        model = Attendance
+        fields = [
+            'id', 'user', 'user_details', 'date',
+            'punch_in', 'punch_out',
+            'status', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out', 'notes',
+            'created_at'
+        ]
+        read_only_fields = [
+            'id', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out', 'created_at'
+        ]
+
+
+# Full serializer with all fields - use only when needed
+class AttendanceDetailSerializer(serializers.ModelSerializer):
+    user_details = UserLightSerializer(source='user', read_only=True)
 
     class Meta:
         model = Attendance
@@ -57,20 +81,19 @@ class AttendanceReportSerializer(serializers.Serializer):
 
 
 class RegularizationRequestSerializer(serializers.ModelSerializer):
-    user_details = UserSerializer(source='user', read_only=True)
-    reviewed_by_details = UserSerializer(source='reviewed_by', read_only=True)
+    user_details = UserLightSerializer(source='user', read_only=True)
+    reviewed_by_name = serializers.CharField(source='reviewed_by.name', read_only=True, allow_null=True)
 
     class Meta:
         model = RegularizationRequest
         fields = [
             'id', 'user', 'user_details', 'attendance', 'date',
             'request_type', 'requested_punch_in', 'requested_punch_out',
-            'reason', 'status', 'reviewed_by', 'reviewed_by_details',
-            'reviewed_on', 'review_remarks', 'created_at', 'updated_at'
+            'reason', 'status', 'reviewed_by', 'reviewed_by_name',
+            'reviewed_on', 'review_remarks', 'created_at'
         ]
         read_only_fields = [
-            'id', 'user', 'status', 'reviewed_by', 'reviewed_on',
-            'created_at', 'updated_at'
+            'id', 'user', 'status', 'reviewed_by', 'reviewed_on', 'created_at'
         ]
 
 
@@ -89,8 +112,8 @@ class RegularizationReviewSerializer(serializers.Serializer):
 
 # WFH Serializers
 class WFHRequestSerializer(serializers.ModelSerializer):
-    user_details = UserSerializer(source='user', read_only=True)
-    reviewed_by_details = UserSerializer(source='reviewed_by', read_only=True)
+    user_details = UserLightSerializer(source='user', read_only=True)
+    reviewed_by_details = UserLightSerializer(source='reviewed_by', read_only=True)
 
     class Meta:
         model = WFHRequest
