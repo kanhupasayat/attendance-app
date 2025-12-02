@@ -705,3 +705,61 @@ class TodayWFHStatusView(APIView):
             "is_wfh": wfh_request is not None,
             "wfh_request": WFHRequestSerializer(wfh_request).data if wfh_request else None
         })
+
+
+class AutoPunchOutView(APIView):
+    """
+    API endpoint to trigger auto punch-out for all employees who forgot to punch out.
+    Secured with CRON_SECRET_KEY.
+    Can be called by external cron services like cron-job.org
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from django.conf import settings
+        from .email_utils import send_auto_punch_out_email
+
+        # Verify secret key
+        secret_key = request.headers.get('X-Cron-Secret') or request.data.get('secret_key')
+        expected_key = getattr(settings, 'CRON_SECRET_KEY', 'attendance-auto-punch-2024')
+
+        if secret_key != expected_key:
+            return Response(
+                {"error": "Unauthorized"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        today = timezone.now().date()
+        now = timezone.now()
+
+        # Find all attendance records with punch_in but no punch_out
+        pending_punch_outs = Attendance.objects.filter(
+            date=today,
+            punch_in__isnull=False,
+            punch_out__isnull=True
+        )
+
+        count = 0
+        punched_out_users = []
+
+        for attendance in pending_punch_outs:
+            # Auto punch out at current time
+            attendance.punch_out = now
+            attendance.is_auto_punch_out = True
+            attendance.notes = f"Auto punch out by system. Employee forgot to punch out."
+            attendance.save()
+
+            punched_out_users.append(attendance.user.name)
+
+            # Send warning email to employee
+            try:
+                send_auto_punch_out_email(attendance)
+            except Exception as e:
+                print(f"Failed to send email to {attendance.user.name}: {e}")
+
+            count += 1
+
+        return Response({
+            "message": f"Auto punch out completed for {count} employee(s)",
+            "employees": punched_out_users
+        })
