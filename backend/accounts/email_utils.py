@@ -264,3 +264,31 @@ Status: {status_text}
     message += f"\n\nView your WFH requests: {frontend_url}/wfh"
 
     send_email_notification(subject, message, wfh_request.user.email)
+
+
+# ================== HOLIDAY NOTIFICATIONS ==================
+
+def send_holiday_notification_email(holiday, employees):
+    """
+    Send email to all employees when a new holiday is added
+    """
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    subject = f"Holiday Announcement: {holiday.name}"
+
+    date_str = holiday.date.strftime('%d %b %Y')
+    day_name = holiday.date.strftime('%A')
+
+    message = f"""
+Holiday Announcement
+
+Office will remain closed on {date_str} ({day_name}) for {holiday.name}.
+
+Enjoy your holiday!
+
+View holiday calendar: {frontend_url}/holidays
+    """
+
+    # Send email to each employee
+    for employee in employees:
+        if employee.email:
+            send_email_notification(subject, message, employee.email)

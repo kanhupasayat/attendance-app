@@ -796,6 +796,14 @@ class HolidayListView(generics.ListCreateAPIView):
             return [IsAdminUser()]
         return [permissions.IsAuthenticated()]
 
+    def perform_create(self, serializer):
+        """Send notification to all employees when holiday is created"""
+        from accounts.utils import notify_all_employees_holiday
+
+        holiday = serializer.save()
+        # Send notification to all employees
+        notify_all_employees_holiday(holiday)
+
 
 class HolidayDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]

@@ -177,3 +177,31 @@ def notify_wfh_status(wfh_request, status, remarks=''):
     )
     # Email notification (async)
     send_email_async(send_wfh_status_email, wfh_request, status, remarks)
+
+
+def notify_all_employees_holiday(holiday):
+    """Notify all active employees when a new holiday is added"""
+    from .email_utils import send_holiday_notification_email
+
+    # Get all active employees
+    employees = User.objects.filter(is_active=True)
+
+    # Format date for display
+    date_str = holiday.date.strftime('%d %b %Y')
+
+    # Create in-app notifications for all employees
+    notifications = []
+    for employee in employees:
+        notifications.append(
+            Notification(
+                user=employee,
+                title=f"Holiday: {holiday.name}",
+                message=f"Office will remain closed on {date_str} ({holiday.name}).",
+                notification_type='holiday',
+                related_id=holiday.id
+            )
+        )
+    Notification.objects.bulk_create(notifications)
+
+    # Send email notifications (async)
+    send_email_async(send_holiday_notification_email, holiday, employees)
