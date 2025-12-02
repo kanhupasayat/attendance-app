@@ -190,17 +190,21 @@ class LeaveApplyView(APIView):
                 balance.carried_forward = max(0, unused)
                 balance.save()
 
-        # Calculate pending leaves for this leave type
-        pending_paid_days = LeaveRequest.objects.filter(
+        # Calculate already used/pending leaves for this leave type in this month
+        # Include both pending AND approved requests
+        already_used_paid_days = LeaveRequest.objects.filter(
             user=request.user,
             leave_type=leave_type,
-            status='pending',
+            status__in=['pending', 'approved'],
             start_date__year=year,
             start_date__month=month
         ).aggregate(total=Sum('paid_days'))['total'] or 0
 
-        # Calculate paid days from leave balance (minus pending)
-        available_leaves = float(balance.available_leaves) - float(pending_paid_days)
+        # Calculate paid days from leave balance
+        # available_leaves from balance already subtracts used_leaves
+        # But we need to also subtract pending requests that haven't updated balance yet
+        total_quota = float(balance.total_leaves) + float(balance.carried_forward)
+        available_leaves = total_quota - float(already_used_paid_days)
         available_leaves = max(0, available_leaves)
         paid_days = min(remaining_days, available_leaves)
         remaining_days -= paid_days
