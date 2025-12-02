@@ -94,8 +94,10 @@ const cachedGet = async (url, params = {}, cacheKey = null) => {
     return { data: cached, fromCache: true };
   }
   const response = await api.get(url, { params });
-  setCache(key, response.data);
-  return response;
+  // Extract array from paginated response before caching
+  const dataToCache = extractData(response.data);
+  setCache(key, dataToCache);
+  return { ...response, data: dataToCache };
 };
 
 // GET request that returns array (handles pagination)
@@ -119,14 +121,7 @@ export const authAPI = {
     });
   },
   changePassword: (data) => api.post('/auth/change-password/', data),
-  getEmployees: async () => {
-    const response = await cachedGet('/auth/employees/', {}, 'employees');
-    // Handle paginated response
-    if (response.data && response.data.results) {
-      return { ...response, data: response.data.results };
-    }
-    return response;
-  },
+  getEmployees: () => cachedGet('/auth/employees/', {}, 'employees'),
   createEmployee: (data) => {
     clearCache();
     return api.post('/auth/employees/', data);

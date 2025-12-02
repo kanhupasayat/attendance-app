@@ -22,9 +22,12 @@ const AttendanceCalendar = () => {
     setLoading(true);
     try {
       const response = await attendanceAPI.getMyAttendance({ month, year });
-      setAttendance(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setAttendance(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching attendance:', error);
+      setAttendance([]);
     } finally {
       setLoading(false);
     }
