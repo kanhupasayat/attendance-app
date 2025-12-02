@@ -342,6 +342,14 @@ class RegularizationApplyView(APIView):
         requested_punch_out = serializer.validated_data.get('requested_punch_out')
         reason = serializer.validated_data['reason']
 
+        # Cannot apply regularization for today or future dates
+        today = timezone.now().date()
+        if date >= today:
+            return Response(
+                {"error": "Regularization can only be applied for past dates"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Check if request already exists for this date
         existing = RegularizationRequest.objects.filter(
             user=request.user,
@@ -461,6 +469,8 @@ class RegularizationReviewView(APIView):
                 )
                 attendance.punch_out = punch_out_datetime
 
+            # Always set status to present when regularization is approved
+            attendance.status = 'present'
             attendance.notes = f"Regularized: {regularization.request_type}"
             attendance.save()
 
