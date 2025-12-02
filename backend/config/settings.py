@@ -11,7 +11,9 @@ import cloudinary
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Environment variables
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-d12nj%jl4b=233$i249(0!fnze(ev4rtib$*bx0_y1tyiwc5)_')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is required")
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 # Allowed hosts
@@ -173,17 +175,17 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'iamkanhu7752@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'ojdgopnnajvesewq')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = f"Attendance System <{EMAIL_HOST_USER}>"
 
 # Frontend URL (for email links)
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 # Cloudinary Settings (for profile photo storage)
-CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME', 'dx9tverbw')
-CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY', '764733391454496')
-CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', '4MmOVh2NQeMZcZHpG_bDfdf2w5c')
+CLOUDINARY_CLOUD_NAME = os.environ.get('CLOUDINARY_CLOUD_NAME', '')
+CLOUDINARY_API_KEY = os.environ.get('CLOUDINARY_API_KEY', '')
+CLOUDINARY_API_SECRET = os.environ.get('CLOUDINARY_API_SECRET', '')
 
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,

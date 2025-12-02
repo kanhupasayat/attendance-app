@@ -1,7 +1,0 @@
-DATABASE_URL=postgresql://neondb_owner:npg_lzucVExD6Z0U@ep-flat-unit-a184pdjz-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
-SECRET_KEY=django-secret-key-for-production-2024-attendance-xyz
-DEBUG=False
-PYTHON_VERSION=3.11.0
-CLOUDINARY_CLOUD_NAME=dx9tverbw
-CLOUDINARY_API_KEY=764733391454496
-CLOUDINARY_API_SECRET=4MmOVh2NQeMZcZHpG_bDfdf2w5c

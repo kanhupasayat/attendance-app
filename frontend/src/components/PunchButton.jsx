@@ -11,35 +11,27 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
   const { getLocation } = useGeolocation();
 
   const performPunchIn = async (coords) => {
-    console.log('[PunchButton] Sending API request with coords:', coords);
     const api = type === 'in' ? attendanceAPI.punchIn : attendanceAPI.punchOut;
-    const response = await api(coords);
-    console.log('[PunchButton] API response:', response);
-
+    await api(coords);
     toast.success(`Punch ${type} successful!`);
     onSuccess?.();
   };
 
   const handlePunch = async () => {
     setLoading(true);
-    console.log('[PunchButton] Starting punch process...');
 
     try {
       // Location is mandatory - get it first
       let coords;
       try {
-        console.log('[PunchButton] Requesting location...');
         coords = await getLocation();
-        console.log('[PunchButton] Location received:', coords);
       } catch (geoError) {
-        console.error('[PunchButton] Location error:', geoError);
         toast.error(geoError || 'Location access is required. Please enable location permission.');
         setLoading(false);
         return;
       }
 
       if (!coords || !coords.latitude || !coords.longitude) {
-        console.error('[PunchButton] Invalid coords:', coords);
         toast.error('Unable to get your location. Please enable GPS and try again.');
         setLoading(false);
         return;
@@ -47,11 +39,9 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
 
       // For punch IN, check if user has approved leave for today
       if (type === 'in') {
-        console.log('[PunchButton] Checking for approved leave...');
         const leaveResponse = await leaveAPI.checkTodayLeave();
 
         if (leaveResponse.data.has_leave) {
-          console.log('[PunchButton] User has leave today:', leaveResponse.data);
           // Store coords and show confirmation modal
           setPendingCoords(coords);
           setLeaveInfo(leaveResponse.data);
@@ -64,8 +54,6 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
       // No leave conflict, proceed with punch
       await performPunchIn(coords);
     } catch (error) {
-      console.error('[PunchButton] API error:', error);
-      console.error('[PunchButton] Error response:', error.response?.data);
       const message = error.response?.data?.error || `Failed to punch ${type}`;
       toast.error(message);
     } finally {
@@ -77,7 +65,6 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
     setLoading(true);
     try {
       // Cancel leave for today
-      console.log('[PunchButton] Cancelling leave for today...');
       const today = new Date().toISOString().split('T')[0];
       await leaveAPI.cancelLeaveForDate({ date: today, leave_id: leaveInfo.leave_id });
       toast.success('Leave cancelled for today');
@@ -90,7 +77,6 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
       setLeaveInfo(null);
       setPendingCoords(null);
     } catch (error) {
-      console.error('[PunchButton] Error cancelling leave:', error);
       const message = error.response?.data?.error || 'Failed to cancel leave';
       toast.error(message);
     } finally {

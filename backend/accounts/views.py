@@ -81,10 +81,9 @@ class OTPRequestView(APIView):
             )
 
             # In production, send OTP via SMS gateway
-            # For now, return OTP in response (dev only)
+            # TODO: Integrate SMS gateway here
             return Response({
-                "message": "OTP sent successfully",
-                "otp": otp.otp  # Remove in production!
+                "message": "OTP sent successfully"
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

@@ -412,10 +412,12 @@ class MonthlyCreditView(APIView):
                 user=emp,
                 leave_type=leave_type,
                 year=year,
+                month=month,
                 defaults={
                     'total_leaves': monthly_credit,
                     'used_leaves': 0,
-                    'carried_forward': 0
+                    'carried_forward': 0,
+                    'lop_days': 0
                 }
             )
 
@@ -553,9 +555,6 @@ class UpdateLeaveRequestView(APIView):
     permission_classes = [IsAdminUser]
 
     def patch(self, request, pk):
-        print(f"[DEBUG] UpdateLeaveRequest called with pk={pk}")
-        print(f"[DEBUG] Request data: {request.data}")
-
         try:
             leave_request = LeaveRequest.objects.get(pk=pk)
         except LeaveRequest.DoesNotExist:
@@ -567,8 +566,6 @@ class UpdateLeaveRequestView(APIView):
         old_status = leave_request.status
         old_paid_days = float(leave_request.paid_days)
         old_lop_days = float(leave_request.lop_days)
-
-        print(f"[DEBUG] Before update - status: {old_status}, paid_days: {old_paid_days}, lop_days: {old_lop_days}")
 
         # Update fields if provided
         if 'status' in request.data:
@@ -585,13 +582,8 @@ class UpdateLeaveRequestView(APIView):
             leave_request.reviewed_by = request.user
             leave_request.reviewed_on = timezone.now()
 
-        print(f"[DEBUG] After field update - status: {leave_request.status}, paid_days: {leave_request.paid_days}, lop_days: {leave_request.lop_days}")
-
         leave_request.save()
-
-        # Reload from database to verify save worked
         leave_request.refresh_from_db()
-        print(f"[DEBUG] After save and refresh - status: {leave_request.status}, paid_days: {leave_request.paid_days}, lop_days: {leave_request.lop_days}")
 
         # Update leave balance if needed
         if old_status == 'approved' or leave_request.status == 'approved':
@@ -603,9 +595,6 @@ class UpdateLeaveRequestView(APIView):
                 year=year,
                 month=month
             ).first()
-
-            print(f"[DEBUG] Looking for balance with user={leave_request.user.id}, leave_type={leave_request.leave_type.id}, year={year}, month={month}")
-            print(f"[DEBUG] Balance found: {balance}")
 
             if balance:
                 # Reverse old deduction if was approved

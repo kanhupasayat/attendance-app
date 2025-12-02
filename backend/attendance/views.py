@@ -27,19 +27,12 @@ class PunchInView(APIView):
     def post(self, request):
         serializer = PunchInSerializer(data=request.data)
         if not serializer.is_valid():
-            print(f"[DEBUG] Serializer errors: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         latitude = serializer.validated_data.get('latitude')
         longitude = serializer.validated_data.get('longitude')
         client_ip = get_client_ip(request)
         today = timezone.now().date()
-
-        print(f"[DEBUG] Punch In Request:")
-        print(f"  User: {request.user}")
-        print(f"  Latitude: {latitude}")
-        print(f"  Longitude: {longitude}")
-        print(f"  Client IP: {client_ip}")
 
         # Check if user has approved WFH for today
         is_wfh = WFHRequest.objects.filter(
@@ -48,13 +41,10 @@ class PunchInView(APIView):
             status='approved'
         ).exists()
 
-        print(f"  Is WFH: {is_wfh}")
-
         # Only validate location and IP if NOT WFH
         if not is_wfh:
             # Validate location
             location_valid, location_msg = validate_location(latitude, longitude)
-            print(f"  Location Valid: {location_valid}, Msg: {location_msg}")
             if not location_valid:
                 return Response(
                     {"error": location_msg},
@@ -63,14 +53,11 @@ class PunchInView(APIView):
 
             # Validate IP
             ip_valid, ip_msg = validate_ip(client_ip)
-            print(f"  IP Valid: {ip_valid}, Msg: {ip_msg}")
             if not ip_valid:
                 return Response(
                     {"error": ip_msg},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        else:
-            print("  Skipping location/IP validation for WFH")
 
         # Check if already punched in today
         existing = Attendance.objects.filter(
