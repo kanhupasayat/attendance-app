@@ -199,7 +199,7 @@ const CompOff = () => {
                 className="flex-1 border rounded-lg px-3 py-2 text-sm"
               >
                 <option value="">All Employees</option>
-                {employees.map((emp) => (
+                {Array.isArray(employees) && employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
                     {emp.name}
                   </option>
@@ -490,7 +490,7 @@ const CompOff = () => {
                     required
                   >
                     <option value="">Select Employee</option>
-                    {employees.map((emp) => (
+                    {Array.isArray(employees) && employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>
                         {emp.name}
                       </option>

@@ -99,11 +99,13 @@ const Attendance = () => {
   ];
 
   // Admin functions
-  const openAddModal = () => {
+  const openAddModal = async () => {
     setModalMode('add');
     setEditingRecord(null);
+    // Fetch fresh employees list
+    await fetchEmployees();
     setFormData({
-      user_id: employees.length > 0 ? employees[0].id : '',
+      user_id: '',
       date: new Date().toISOString().split('T')[0],
       punch_in: '',
       punch_out: '',
@@ -411,7 +413,7 @@ const Attendance = () => {
                     required
                   >
                     <option value="">Select Employee</option>
-                    {employees.map((emp) => (
+                    {Array.isArray(employees) && employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>
                         {emp.name} ({emp.mobile})
                       </option>

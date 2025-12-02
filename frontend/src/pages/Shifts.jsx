@@ -186,7 +186,10 @@ const Shifts = () => {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setShowAssignModal(true)}
+                onClick={() => {
+                  fetchEmployees();
+                  setShowAssignModal(true);
+                }}
                 className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
               >
                 Assign Shift
@@ -484,25 +487,29 @@ const Shifts = () => {
                     Select Employees ({assignData.user_ids.length} selected)
                   </label>
                   <div className="max-h-60 overflow-y-auto border rounded-lg">
-                    {employees.map((emp) => (
-                      <label
-                        key={emp.id}
-                        className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={assignData.user_ids.includes(emp.id)}
-                          onChange={() => toggleEmployeeSelection(emp.id)}
-                          className="mr-3 h-4 w-4"
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-800">{emp.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {emp.shift_name || 'No shift assigned'}
-                          </p>
-                        </div>
-                      </label>
-                    ))}
+                    {employees.length === 0 ? (
+                      <p className="p-3 text-gray-500 text-center">No employees found</p>
+                    ) : (
+                      employees.map((emp) => (
+                        <label
+                          key={emp.id}
+                          className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={assignData.user_ids.includes(emp.id)}
+                            onChange={() => toggleEmployeeSelection(emp.id)}
+                            className="mr-3 h-4 w-4"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-800">{emp.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {emp.shift_name || 'No shift assigned'}
+                            </p>
+                          </div>
+                        </label>
+                      ))
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-4">
