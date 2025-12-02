@@ -121,8 +121,8 @@ class RegularizationRequest(models.Model):
 
 class OfficeLocation(models.Model):
     name = models.CharField(max_length=100)
-    latitude = models.DecimalField(max_digits=10, decimal_places=7)
-    longitude = models.DecimalField(max_digits=10, decimal_places=7)
+    latitude = models.DecimalField(max_digits=20, decimal_places=15)
+    longitude = models.DecimalField(max_digits=20, decimal_places=15)
     radius_meters = models.IntegerField(default=50)
     allowed_ips = models.TextField(
         blank=True,
