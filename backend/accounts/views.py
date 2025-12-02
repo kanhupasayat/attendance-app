@@ -156,12 +156,7 @@ class EmployeeListView(generics.ListCreateAPIView):
     serializer_class = UserSerializer
 
     def get_queryset(self):
-        return User.objects.filter(role='employee').select_related('shift').only(
-            'id', 'mobile', 'name', 'email', 'role', 'department',
-            'date_of_joining', 'is_active', 'is_admin', 'weekly_off',
-            'photo', 'shift_id',
-            'shift__id', 'shift__name', 'shift__start_time', 'shift__end_time'
-        ).order_by('name')
+        return User.objects.filter(role='employee').select_related('shift').order_by('name')
 
     def get_serializer_class(self):
         if self.request.method == 'POST':

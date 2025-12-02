@@ -305,15 +305,7 @@ class MyLeaveRequestsView(generics.ListAPIView):
     def get_queryset(self):
         return LeaveRequest.objects.filter(
             user=self.request.user
-        ).select_related('leave_type', 'reviewed_by', 'user').only(
-            'id', 'user_id', 'leave_type_id', 'start_date', 'end_date',
-            'is_half_day', 'half_day_type', 'reason', 'status', 'total_days',
-            'comp_off_days', 'paid_days', 'lop_days', 'is_lop', 'review_remarks',
-            'reviewed_by_id', 'reviewed_on', 'created_at',
-            'user__id', 'user__name', 'user__mobile', 'user__department',
-            'leave_type__id', 'leave_type__name', 'leave_type__code',
-            'reviewed_by__id', 'reviewed_by__name'
-        ).order_by('-created_at')
+        ).select_related('leave_type', 'reviewed_by', 'user').order_by('-created_at')
 
 
 class CancelLeaveRequestView(APIView):
@@ -348,14 +340,6 @@ class AllLeaveRequestsView(generics.ListAPIView):
     def get_queryset(self):
         queryset = LeaveRequest.objects.select_related(
             'user', 'leave_type', 'reviewed_by'
-        ).only(
-            'id', 'user_id', 'leave_type_id', 'start_date', 'end_date',
-            'is_half_day', 'half_day_type', 'reason', 'status', 'total_days',
-            'comp_off_days', 'paid_days', 'lop_days', 'is_lop', 'review_remarks',
-            'reviewed_by_id', 'reviewed_on', 'created_at',
-            'user__id', 'user__name', 'user__mobile', 'user__department',
-            'leave_type__id', 'leave_type__name', 'leave_type__code',
-            'reviewed_by__id', 'reviewed_by__name'
         )
 
         status_filter = self.request.query_params.get('status')

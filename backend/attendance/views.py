@@ -409,12 +409,7 @@ class MyAttendanceListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = Attendance.objects.filter(
             user=self.request.user
-        ).select_related('user').only(
-            'id', 'user_id', 'date', 'punch_in', 'punch_out',
-            'status', 'working_hours', 'is_off_day', 'is_wfh',
-            'is_auto_punch_out', 'notes', 'created_at',
-            'user__id', 'user__name', 'user__mobile', 'user__department'
-        )
+        ).select_related('user')
 
         # Filter by date range
         start_date = self.request.query_params.get('start_date')
@@ -438,12 +433,7 @@ class AllAttendanceListView(generics.ListAPIView):
     serializer_class = AttendanceSerializer
 
     def get_queryset(self):
-        queryset = Attendance.objects.select_related('user').only(
-            'id', 'user_id', 'date', 'punch_in', 'punch_out',
-            'status', 'working_hours', 'is_off_day', 'is_wfh',
-            'is_auto_punch_out', 'notes', 'created_at',
-            'user__id', 'user__name', 'user__mobile', 'user__department'
-        )
+        queryset = Attendance.objects.select_related('user')
 
         user_id = self.request.query_params.get('user_id')
         start_date = self.request.query_params.get('start_date')
