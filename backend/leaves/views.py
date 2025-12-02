@@ -694,6 +694,115 @@ class CheckTodayLeaveView(APIView):
         })
 
 
+class ProcessMonthEndView(APIView):
+    """
+    API endpoint to process month-end:
+    - Convert unused sick leave to comp off
+    Can be called by cron services (similar to auto punch-out)
+    """
+    permission_classes = []  # Allow unauthenticated for cron
+
+    def post(self, request):
+        from django.conf import settings
+        from attendance.models import CompOff
+        from datetime import date, timedelta
+
+        # Security check - require a secret key
+        cron_secret = request.data.get('secret') or request.query_params.get('secret')
+        expected_secret = getattr(settings, 'CRON_SECRET_KEY', 'your-cron-secret-key')
+
+        if cron_secret != expected_secret:
+            return Response(
+                {"error": "Invalid cron secret"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        today = timezone.now().date()
+
+        # Process previous month
+        if today.month == 1:
+            process_month = 12
+            process_year = today.year - 1
+        else:
+            process_month = today.month - 1
+            process_year = today.year
+
+        # Get sick leave type
+        sick_leave = LeaveType.objects.filter(code='SL', is_active=True).first()
+        if not sick_leave:
+            return Response(
+                {"error": "Sick Leave type not found"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from accounts.models import User
+        employees = User.objects.filter(role='employee', is_active=True)
+
+        results = []
+        comp_off_created = 0
+
+        for employee in employees:
+            # Get sick leave balance for the processed month
+            sl_balance = LeaveBalance.objects.filter(
+                user=employee,
+                leave_type=sick_leave,
+                year=process_year,
+                month=process_month
+            ).first()
+
+            monthly_sick_leave = 1  # 1 sick leave per month
+            used_this_month = float(sl_balance.used_leaves) if sl_balance else 0
+
+            if used_this_month < monthly_sick_leave:
+                unused_days = monthly_sick_leave - used_this_month
+
+                # Last day of processed month
+                if process_month == 12:
+                    last_day = date(process_year, 12, 31)
+                else:
+                    last_day = date(process_year, process_month + 1, 1) - timedelta(days=1)
+
+                # Check if already exists
+                existing = CompOff.objects.filter(
+                    user=employee,
+                    earned_date=last_day,
+                    reason__contains='Unused Sick Leave'
+                ).first()
+
+                if not existing:
+                    CompOff.objects.create(
+                        user=employee,
+                        earned_date=last_day,
+                        earned_hours=unused_days * 8,
+                        credit_days=unused_days,
+                        reason=f'Unused Sick Leave for {process_month}/{process_year}',
+                        status='earned'
+                    )
+                    comp_off_created += 1
+                    results.append({
+                        'employee': employee.name,
+                        'unused_sick_leave': unused_days,
+                        'comp_off_created': True
+                    })
+                else:
+                    results.append({
+                        'employee': employee.name,
+                        'message': 'Comp off already exists'
+                    })
+            else:
+                results.append({
+                    'employee': employee.name,
+                    'sick_leave_used': used_this_month,
+                    'comp_off_created': False
+                })
+
+        return Response({
+            "message": f"Processed month-end for {process_month}/{process_year}",
+            "comp_offs_created": comp_off_created,
+            "results": results
+        })
+
+
 class CancelLeaveForDateView(APIView):
     """Cancel leave for a specific date - handles splitting if needed"""
 
