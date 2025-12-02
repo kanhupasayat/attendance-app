@@ -5,9 +5,16 @@ from django.utils import timezone
 from django.db.models import Sum, Count, Q
 from datetime import datetime, timedelta
 import csv
+import pytz
 from django.http import HttpResponse
 
 from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest, Shift, CompOff
+
+
+def get_india_date():
+    """Get current date in India timezone (IST)"""
+    india_tz = pytz.timezone('Asia/Kolkata')
+    return timezone.now().astimezone(india_tz).date()
 from .serializers import (
     AttendanceSerializer, PunchInSerializer, PunchOutSerializer,
     OfficeLocationSerializer, AttendanceReportSerializer,
@@ -34,7 +41,7 @@ class PunchInView(APIView):
         latitude = serializer.validated_data.get('latitude')
         longitude = serializer.validated_data.get('longitude')
         client_ip = get_client_ip(request)
-        today = timezone.now().date()
+        today = get_india_date()
 
         # Check if user has approved WFH for today
         is_wfh = WFHRequest.objects.filter(
@@ -116,7 +123,7 @@ class PunchOutView(APIView):
         latitude = serializer.validated_data.get('latitude')
         longitude = serializer.validated_data.get('longitude')
         client_ip = get_client_ip(request)
-        today = timezone.now().date()
+        today = get_india_date()
 
         # Check if user has approved WFH for today
         is_wfh = WFHRequest.objects.filter(
@@ -175,7 +182,7 @@ class PunchOutView(APIView):
 
 class TodayAttendanceView(APIView):
     def get(self, request):
-        today = timezone.now().date()
+        today = get_india_date()
         attendance = Attendance.objects.filter(
             user=request.user, date=today
         ).first()
@@ -362,7 +369,7 @@ class RegularizationApplyView(APIView):
         reason = serializer.validated_data['reason']
 
         # Cannot apply regularization for future dates (today is allowed)
-        today = timezone.now().date()
+        today = get_india_date()
         if date > today:
             return Response(
                 {"error": "Regularization cannot be applied for future dates"},
@@ -539,7 +546,7 @@ class WFHApplyView(APIView):
 
         date = serializer.validated_data['date']
         reason = serializer.validated_data['reason']
-        today = timezone.now().date()
+        today = get_india_date()
 
         # Cannot apply WFH for past dates
         if date < today:
@@ -683,7 +690,7 @@ class TodayWFHStatusView(APIView):
     """Check if user has approved WFH for today"""
 
     def get(self, request):
-        today = timezone.now().date()
+        today = get_india_date()
         wfh_request = WFHRequest.objects.filter(
             user=request.user,
             date=today,
@@ -718,7 +725,7 @@ class AutoPunchOutView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        today = timezone.now().date()
+        today = get_india_date()
         now = timezone.now()
 
         # Find all attendance records with punch_in but no punch_out
@@ -1101,7 +1108,7 @@ class CompOffBalanceView(APIView):
         )['total'] or 0
 
         # Check and mark expired comp offs
-        today = timezone.now().date()
+        today = get_india_date()
         CompOff.objects.filter(
             user=user,
             status='earned',

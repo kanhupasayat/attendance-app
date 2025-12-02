@@ -4,9 +4,16 @@ from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Sum
 import csv
+import pytz
 from django.http import HttpResponse
 
 from .models import LeaveType, LeaveBalance, LeaveRequest, Holiday
+
+
+def get_india_date():
+    """Get current date in India timezone (IST)"""
+    india_tz = pytz.timezone('Asia/Kolkata')
+    return timezone.now().astimezone(india_tz).date()
 from .serializers import (
     LeaveTypeSerializer, LeaveBalanceSerializer, LeaveRequestSerializer,
     LeaveApplySerializer, LeaveReviewSerializer, HolidaySerializer
@@ -800,7 +807,7 @@ class CheckTodayLeaveView(APIView):
     """Check if user has approved leave for today"""
 
     def get(self, request):
-        today = timezone.now().date()
+        today = get_india_date()
 
         # Find approved leave that includes today
         leave_request = LeaveRequest.objects.filter(
@@ -849,7 +856,7 @@ class ProcessMonthEndView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        today = timezone.now().date()
+        today = get_india_date()
 
         # Process previous month
         if today.month == 1:
@@ -941,7 +948,7 @@ class CancelLeaveForDateView(APIView):
     def post(self, request):
         date_str = request.data.get('date')
         if not date_str:
-            date_to_cancel = timezone.now().date()
+            date_to_cancel = get_india_date()
         else:
             from datetime import datetime
             date_to_cancel = datetime.strptime(date_str, '%Y-%m-%d').date()
