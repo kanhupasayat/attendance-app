@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Attendance, OfficeLocation, RegularizationRequest
+from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest
 from accounts.serializers import UserSerializer
 
 
@@ -14,11 +14,11 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'punch_in_latitude', 'punch_in_longitude',
             'punch_out_latitude', 'punch_out_longitude',
             'punch_in_ip', 'punch_out_ip',
-            'status', 'working_hours', 'is_off_day', 'is_auto_punch_out', 'notes',
+            'status', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out', 'notes',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'working_hours', 'is_off_day', 'is_auto_punch_out', 'created_at', 'updated_at'
+            'id', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out', 'created_at', 'updated_at'
         ]
 
 
@@ -79,5 +79,33 @@ class RegularizationApplySerializer(serializers.Serializer):
 
 
 class RegularizationReviewSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=['approved', 'rejected'])
+    review_remarks = serializers.CharField(required=False, allow_blank=True)
+
+
+# WFH Serializers
+class WFHRequestSerializer(serializers.ModelSerializer):
+    user_details = UserSerializer(source='user', read_only=True)
+    reviewed_by_details = UserSerializer(source='reviewed_by', read_only=True)
+
+    class Meta:
+        model = WFHRequest
+        fields = [
+            'id', 'user', 'user_details', 'date', 'reason',
+            'status', 'reviewed_by', 'reviewed_by_details',
+            'reviewed_on', 'review_remarks', 'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'user', 'status', 'reviewed_by', 'reviewed_on',
+            'created_at', 'updated_at'
+        ]
+
+
+class WFHApplySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    reason = serializers.CharField()
+
+
+class WFHReviewSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=['approved', 'rejected'])
     review_remarks = serializers.CharField(required=False, allow_blank=True)

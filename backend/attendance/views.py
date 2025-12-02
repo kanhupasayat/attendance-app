@@ -7,16 +7,20 @@ from datetime import datetime, timedelta
 import csv
 from django.http import HttpResponse
 
-from .models import Attendance, OfficeLocation, RegularizationRequest
+from .models import Attendance, OfficeLocation, RegularizationRequest, WFHRequest
 from .serializers import (
     AttendanceSerializer, PunchInSerializer, PunchOutSerializer,
     OfficeLocationSerializer, AttendanceReportSerializer,
     RegularizationRequestSerializer, RegularizationApplySerializer,
-    RegularizationReviewSerializer
+    RegularizationReviewSerializer, WFHRequestSerializer,
+    WFHApplySerializer, WFHReviewSerializer
 )
 from .utils import validate_location, validate_ip, get_client_ip
 from accounts.views import IsAdminUser
-from accounts.utils import notify_regularization_applied, notify_regularization_status
+from accounts.utils import (
+    notify_regularization_applied, notify_regularization_status,
+    notify_wfh_applied, notify_wfh_status
+)
 
 
 class PunchInView(APIView):
@@ -29,6 +33,7 @@ class PunchInView(APIView):
         latitude = serializer.validated_data.get('latitude')
         longitude = serializer.validated_data.get('longitude')
         client_ip = get_client_ip(request)
+        today = timezone.now().date()
 
         print(f"[DEBUG] Punch In Request:")
         print(f"  User: {request.user}")
@@ -36,26 +41,38 @@ class PunchInView(APIView):
         print(f"  Longitude: {longitude}")
         print(f"  Client IP: {client_ip}")
 
-        # Validate location
-        location_valid, location_msg = validate_location(latitude, longitude)
-        print(f"  Location Valid: {location_valid}, Msg: {location_msg}")
-        if not location_valid:
-            return Response(
-                {"error": location_msg},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Check if user has approved WFH for today
+        is_wfh = WFHRequest.objects.filter(
+            user=request.user,
+            date=today,
+            status='approved'
+        ).exists()
 
-        # Validate IP
-        ip_valid, ip_msg = validate_ip(client_ip)
-        print(f"  IP Valid: {ip_valid}, Msg: {ip_msg}")
-        if not ip_valid:
-            return Response(
-                {"error": ip_msg},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        print(f"  Is WFH: {is_wfh}")
+
+        # Only validate location and IP if NOT WFH
+        if not is_wfh:
+            # Validate location
+            location_valid, location_msg = validate_location(latitude, longitude)
+            print(f"  Location Valid: {location_valid}, Msg: {location_msg}")
+            if not location_valid:
+                return Response(
+                    {"error": location_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate IP
+            ip_valid, ip_msg = validate_ip(client_ip)
+            print(f"  IP Valid: {ip_valid}, Msg: {ip_msg}")
+            if not ip_valid:
+                return Response(
+                    {"error": ip_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            print("  Skipping location/IP validation for WFH")
 
         # Check if already punched in today
-        today = timezone.now().date()
         existing = Attendance.objects.filter(
             user=request.user, date=today
         ).first()
@@ -78,6 +95,7 @@ class PunchInView(APIView):
             existing.punch_in_longitude = longitude
             existing.punch_in_ip = client_ip
             existing.is_off_day = is_off_day
+            existing.is_wfh = is_wfh
             existing.save()
             attendance = existing
         else:
@@ -89,11 +107,13 @@ class PunchInView(APIView):
                 punch_in_latitude=latitude,
                 punch_in_longitude=longitude,
                 punch_in_ip=client_ip,
-                is_off_day=is_off_day
+                is_off_day=is_off_day,
+                is_wfh=is_wfh
             )
 
+        msg = "Punch in successful (Work From Home)" if is_wfh else "Punch in successful"
         return Response({
-            "message": "Punch in successful",
+            "message": msg,
             "data": AttendanceSerializer(attendance).data
         }, status=status.HTTP_201_CREATED)
 
@@ -107,25 +127,34 @@ class PunchOutView(APIView):
         latitude = serializer.validated_data.get('latitude')
         longitude = serializer.validated_data.get('longitude')
         client_ip = get_client_ip(request)
+        today = timezone.now().date()
 
-        # Validate location
-        location_valid, location_msg = validate_location(latitude, longitude)
-        if not location_valid:
-            return Response(
-                {"error": location_msg},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Check if user has approved WFH for today
+        is_wfh = WFHRequest.objects.filter(
+            user=request.user,
+            date=today,
+            status='approved'
+        ).exists()
 
-        # Validate IP
-        ip_valid, ip_msg = validate_ip(client_ip)
-        if not ip_valid:
-            return Response(
-                {"error": ip_msg},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Only validate location and IP if NOT WFH
+        if not is_wfh:
+            # Validate location
+            location_valid, location_msg = validate_location(latitude, longitude)
+            if not location_valid:
+                return Response(
+                    {"error": location_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate IP
+            ip_valid, ip_msg = validate_ip(client_ip)
+            if not ip_valid:
+                return Response(
+                    {"error": ip_msg},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         # Check if punched in today
-        today = timezone.now().date()
         attendance = Attendance.objects.filter(
             user=request.user, date=today
         ).first()
@@ -148,8 +177,9 @@ class PunchOutView(APIView):
         attendance.punch_out_ip = client_ip
         attendance.save()  # This will calculate working hours
 
+        msg = "Punch out successful (Work From Home)" if is_wfh else "Punch out successful"
         return Response({
-            "message": "Punch out successful",
+            "message": msg,
             "data": AttendanceSerializer(attendance).data
         })
 
@@ -507,3 +537,171 @@ class CancelRegularizationView(APIView):
         regularization.delete()
 
         return Response({"message": "Regularization request cancelled"})
+
+
+# WFH (Work From Home) Views
+class WFHApplyView(APIView):
+    """Employee applies for Work From Home"""
+
+    def post(self, request):
+        serializer = WFHApplySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        date = serializer.validated_data['date']
+        reason = serializer.validated_data['reason']
+        today = timezone.now().date()
+
+        # Cannot apply WFH for past dates
+        if date < today:
+            return Response(
+                {"error": "WFH can only be applied for today or future dates"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if request already exists for this date
+        existing = WFHRequest.objects.filter(
+            user=request.user,
+            date=date
+        ).first()
+
+        if existing:
+            if existing.status == 'pending':
+                return Response(
+                    {"error": "A pending WFH request already exists for this date"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif existing.status == 'approved':
+                return Response(
+                    {"error": "WFH is already approved for this date"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            elif existing.status == 'rejected':
+                # Allow reapplying if previously rejected
+                existing.delete()
+
+        # Create WFH request
+        wfh_request = WFHRequest.objects.create(
+            user=request.user,
+            date=date,
+            reason=reason
+        )
+
+        # Notify admins about new WFH request
+        notify_wfh_applied(wfh_request)
+
+        return Response({
+            "message": "WFH request submitted successfully",
+            "data": WFHRequestSerializer(wfh_request).data
+        }, status=status.HTTP_201_CREATED)
+
+
+class MyWFHListView(generics.ListAPIView):
+    """Employee views their own WFH requests"""
+    serializer_class = WFHRequestSerializer
+
+    def get_queryset(self):
+        return WFHRequest.objects.filter(user=self.request.user)
+
+
+class AllWFHListView(generics.ListAPIView):
+    """Admin views all WFH requests"""
+    permission_classes = [IsAdminUser]
+    serializer_class = WFHRequestSerializer
+
+    def get_queryset(self):
+        queryset = WFHRequest.objects.all()
+
+        status_filter = self.request.query_params.get('status')
+        user_id = self.request.query_params.get('user_id')
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        return queryset
+
+
+class WFHReviewView(APIView):
+    """Admin reviews (approves/rejects) a WFH request"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        try:
+            wfh_request = WFHRequest.objects.get(pk=pk)
+        except WFHRequest.DoesNotExist:
+            return Response(
+                {"error": "WFH request not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if wfh_request.status != 'pending':
+            return Response(
+                {"error": "This request has already been reviewed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = WFHReviewSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        new_status = serializer.validated_data['status']
+        review_remarks = serializer.validated_data.get('review_remarks', '')
+
+        wfh_request.status = new_status
+        wfh_request.reviewed_by = request.user
+        wfh_request.reviewed_on = timezone.now()
+        wfh_request.review_remarks = review_remarks
+        wfh_request.save()
+
+        # Notify employee about WFH status
+        notify_wfh_status(wfh_request, new_status, review_remarks)
+
+        return Response({
+            "message": f"WFH request {new_status}",
+            "data": WFHRequestSerializer(wfh_request).data
+        })
+
+
+class CancelWFHView(APIView):
+    """Employee cancels their own pending WFH request"""
+
+    def post(self, request, pk):
+        try:
+            wfh_request = WFHRequest.objects.get(
+                pk=pk,
+                user=request.user
+            )
+        except WFHRequest.DoesNotExist:
+            return Response(
+                {"error": "WFH request not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if wfh_request.status != 'pending':
+            return Response(
+                {"error": "Only pending requests can be cancelled"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        wfh_request.delete()
+
+        return Response({"message": "WFH request cancelled"})
+
+
+class TodayWFHStatusView(APIView):
+    """Check if user has approved WFH for today"""
+
+    def get(self, request):
+        today = timezone.now().date()
+        wfh_request = WFHRequest.objects.filter(
+            user=request.user,
+            date=today,
+            status='approved'
+        ).first()
+
+        return Response({
+            "is_wfh": wfh_request is not None,
+            "wfh_request": WFHRequestSerializer(wfh_request).data if wfh_request else None
+        })

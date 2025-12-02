@@ -27,6 +27,7 @@ const LeaveHistory = lazy(() => import('./pages/LeaveHistory'));
 const Holidays = lazy(() => import('./pages/Holidays'));
 const Regularization = lazy(() => import('./pages/Regularization'));
 const ProfileRequests = lazy(() => import('./pages/ProfileRequests'));
+const WFH = lazy(() => import('./pages/WFH'));
 
 function App() {
   return (
@@ -93,6 +94,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Regularization />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wfh"
+              element={
+                <ProtectedRoute>
+                  <WFH />
                 </ProtectedRoute>
               }
             />

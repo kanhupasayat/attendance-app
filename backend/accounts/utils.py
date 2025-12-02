@@ -143,3 +143,37 @@ def notify_profile_update_status(update_request, status, remarks=''):
     )
     # Email notification (async)
     send_email_async(send_profile_update_status_email, update_request, status, remarks)
+
+
+def notify_wfh_applied(wfh_request):
+    """Notify admins when a new WFH request is submitted"""
+    from .email_utils import send_wfh_applied_email
+
+    # In-app notification
+    notify_admins(
+        title="New WFH Request",
+        message=f"{wfh_request.user.name} has applied for Work From Home on {wfh_request.date}",
+        notification_type='wfh_applied',
+        related_id=wfh_request.id
+    )
+    # Email notification (async)
+    send_email_async(send_wfh_applied_email, wfh_request)
+
+
+def notify_wfh_status(wfh_request, status, remarks=''):
+    """Notify employee when their WFH request is approved/rejected"""
+    from .email_utils import send_wfh_status_email
+
+    notification_type = 'wfh_approved' if status == 'approved' else 'wfh_rejected'
+    status_text = 'approved' if status == 'approved' else 'rejected'
+
+    # In-app notification
+    create_notification(
+        user=wfh_request.user,
+        title=f"WFH Request {status_text.title()}",
+        message=f"Your Work From Home request for {wfh_request.date} has been {status_text}.",
+        notification_type=notification_type,
+        related_id=wfh_request.id
+    )
+    # Email notification (async)
+    send_email_async(send_wfh_status_email, wfh_request, status, remarks)

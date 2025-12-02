@@ -4,7 +4,9 @@ from .views import (
     AllAttendanceListView, AttendanceReportView, ExportAttendanceCSVView,
     OfficeLocationListView, OfficeLocationDetailView, OffDayWorkStatsView,
     RegularizationApplyView, MyRegularizationListView, AllRegularizationListView,
-    RegularizationReviewView, CancelRegularizationView
+    RegularizationReviewView, CancelRegularizationView,
+    WFHApplyView, MyWFHListView, AllWFHListView, WFHReviewView,
+    CancelWFHView, TodayWFHStatusView
 )
 
 urlpatterns = [
@@ -30,4 +32,12 @@ urlpatterns = [
     # Office locations
     path('locations/', OfficeLocationListView.as_view(), name='office-locations'),
     path('locations/<int:pk>/', OfficeLocationDetailView.as_view(), name='office-location-detail'),
+
+    # WFH (Work From Home)
+    path('wfh/apply/', WFHApplyView.as_view(), name='wfh-apply'),
+    path('wfh/my-requests/', MyWFHListView.as_view(), name='my-wfh'),
+    path('wfh/today-status/', TodayWFHStatusView.as_view(), name='today-wfh-status'),
+    path('wfh/cancel/<int:pk>/', CancelWFHView.as_view(), name='cancel-wfh'),
+    path('wfh/all/', AllWFHListView.as_view(), name='all-wfh'),
+    path('wfh/review/<int:pk>/', WFHReviewView.as_view(), name='review-wfh'),
 ]

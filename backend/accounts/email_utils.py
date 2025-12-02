@@ -215,3 +215,52 @@ Status: {status_text}
     message += f"\n\nView your attendance: {frontend_url}/attendance"
 
     send_email_notification(subject, message, regularization.user.email)
+
+
+# ================== WFH (WORK FROM HOME) NOTIFICATIONS ==================
+
+def send_wfh_applied_email(wfh_request):
+    """
+    Send email to admin when employee applies for WFH
+    """
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    subject = f"Work From Home Request - {wfh_request.user.name}"
+
+    message = f"""
+New Work From Home Request
+
+Employee: {wfh_request.user.name}
+Department: {wfh_request.user.department or 'N/A'}
+Date: {wfh_request.date.strftime('%d %b %Y')}
+Reason: {wfh_request.reason}
+
+Click here to review: {frontend_url}/admin/wfh-requests
+    """
+    send_email_to_admins(subject, message)
+
+
+def send_wfh_status_email(wfh_request, action, remarks=''):
+    """
+    Send email to employee when WFH is approved/rejected
+    """
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    status_text = 'Approved' if action == 'approved' else 'Rejected'
+    subject = f"WFH Request {status_text}"
+
+    message = f"""
+Your Work From Home Request has been {status_text}
+
+Date: {wfh_request.date.strftime('%d %b %Y')}
+Status: {status_text}
+"""
+    if remarks:
+        message += f"Remarks: {remarks}\n"
+
+    if action == 'approved':
+        message += "\nYou can now punch in/out from anywhere on this date."
+    else:
+        message += "\nPlease contact HR if you have any questions."
+
+    message += f"\n\nView your WFH requests: {frontend_url}/wfh"
+
+    send_email_notification(subject, message, wfh_request.user.email)

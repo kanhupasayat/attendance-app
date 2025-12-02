@@ -169,6 +169,13 @@ export const attendanceAPI = {
   getAllRegularizations: (params) => api.get('/attendance/regularization/all/', { params }),
   reviewRegularization: (id, data) => api.post(`/attendance/regularization/review/${id}/`, data),
   cancelRegularization: (id) => api.post(`/attendance/regularization/cancel/${id}/`),
+  // WFH (Work From Home)
+  applyWFH: (data) => api.post('/attendance/wfh/apply/', data),
+  getMyWFH: () => api.get('/attendance/wfh/my-requests/'),
+  getAllWFH: (params) => api.get('/attendance/wfh/all/', { params }),
+  reviewWFH: (id, data) => api.post(`/attendance/wfh/review/${id}/`, data),
+  cancelWFH: (id) => api.post(`/attendance/wfh/cancel/${id}/`),
+  getTodayWFHStatus: () => api.get('/attendance/wfh/today-status/'),
 };
 
 // Leave APIs

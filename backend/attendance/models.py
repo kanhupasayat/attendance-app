@@ -38,6 +38,7 @@ class Attendance(models.Model):
         max_digits=4, decimal_places=2, default=0.00
     )
     is_off_day = models.BooleanField(default=False, help_text="True if employee worked on their weekly off day")
+    is_wfh = models.BooleanField(default=False, help_text="True if employee worked from home")
     is_auto_punch_out = models.BooleanField(default=False, help_text="True if system auto punched out at 11 PM")
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -140,3 +141,40 @@ class OfficeLocation(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class WFHRequest(models.Model):
+    """Work From Home Request Model"""
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='wfh_requests'
+    )
+    date = models.DateField()
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_wfh_requests'
+    )
+    reviewed_on = models.DateTimeField(null=True, blank=True)
+    review_remarks = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'wfh_requests'
+        ordering = ['-created_at']
+        unique_together = ('user', 'date')
+
+    def __str__(self):
+        return f"{self.user.name} - WFH - {self.date}"
