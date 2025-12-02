@@ -72,18 +72,29 @@ class MyLeaveBalanceView(APIView):
                 balance.total_leaves = 1
                 balance.save()
 
-            # Recalculate used_leaves from approved leave requests
-            approved_paid_days = LeaveRequest.objects.filter(
+            # Recalculate used_leaves and lop_days from approved leave requests
+            approved_data = LeaveRequest.objects.filter(
                 user=request.user,
                 leave_type=lt,
                 status='approved',
                 start_date__year=year,
                 start_date__month=month
-            ).aggregate(total=Sum('paid_days'))['total'] or 0
+            ).aggregate(
+                total_paid=Sum('paid_days'),
+                total_lop=Sum('lop_days')
+            )
+            approved_paid_days = approved_data['total_paid'] or 0
+            approved_lop_days = approved_data['total_lop'] or 0
 
-            # Update used_leaves if different
+            # Update used_leaves and lop_days if different
+            needs_save = False
             if float(balance.used_leaves) != float(approved_paid_days):
                 balance.used_leaves = approved_paid_days
+                needs_save = True
+            if float(balance.lop_days) != float(approved_lop_days):
+                balance.lop_days = approved_lop_days
+                needs_save = True
+            if needs_save:
                 balance.save()
 
             # If new month balance created, calculate carry forward from previous month
