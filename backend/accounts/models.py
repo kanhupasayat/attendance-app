@@ -132,6 +132,10 @@ class Notification(models.Model):
         ('profile_update_requested', 'Profile Update Requested'),
         ('profile_update_approved', 'Profile Update Approved'),
         ('profile_update_rejected', 'Profile Update Rejected'),
+        ('wfh_applied', 'WFH Applied'),
+        ('wfh_approved', 'WFH Approved'),
+        ('wfh_rejected', 'WFH Rejected'),
+        ('holiday', 'Holiday'),
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
