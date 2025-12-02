@@ -261,9 +261,14 @@ const LeaveHistory = () => {
                           )}
                           {request.is_half_day && ' (Half)'}
                         </p>
-                        <p className="text-xs text-gray-500 truncate mb-2">
+                        <p className="text-xs text-gray-500 truncate mb-1">
                           {request.reason}
                         </p>
+                        {request.review_remarks && (
+                          <p className="text-xs text-blue-600 mb-1 truncate">
+                            {request.review_remarks}
+                          </p>
+                        )}
                         <div className="flex flex-wrap gap-2 text-xs">
                           <span className="text-gray-600">Total: <span className="font-medium">{request.total_days}</span></span>
                           {request.status === 'approved' && (

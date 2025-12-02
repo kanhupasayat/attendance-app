@@ -372,10 +372,10 @@ const Dashboard = () => {
                     </div>
                   </div>
 
-                  {/* Show remarks if rejected */}
-                  {leave.status === 'rejected' && leave.review_remarks && (
-                    <p className="mt-2 text-xs text-red-600">
-                      <span className="font-medium">Reason:</span> {leave.review_remarks}
+                  {/* Show remarks if rejected or auto-adjusted */}
+                  {leave.review_remarks && (
+                    <p className={`mt-2 text-xs ${leave.status === 'rejected' ? 'text-red-600' : 'text-blue-600'}`}>
+                      <span className="font-medium">{leave.status === 'rejected' ? 'Reason:' : 'Note:'}</span> {leave.review_remarks}
                     </p>
                   )}
                 </div>
