@@ -1203,6 +1203,18 @@ class AdminCreateCompOffView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Check if comp off already exists for this user and date
+        existing = CompOff.objects.filter(
+            user=user,
+            earned_date=earned_date
+        ).first()
+
+        if existing:
+            return Response(
+                {"error": f"Comp off already exists for {user.name} on {earned_date}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         comp_off = CompOff.objects.create(
             user=user,
             earned_date=earned_date,
