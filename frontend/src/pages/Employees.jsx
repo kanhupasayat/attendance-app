@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { authAPI } from '../services/api';
+import { authAPI, attendanceAPI, leaveAPI } from '../services/api';
 import Layout from '../components/Layout';
 
 const Employees = () => {
@@ -17,6 +17,12 @@ const Employees = () => {
     weekly_off: 6,
     password: '',
   });
+
+  // Profile view modal states
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [employeeStats, setEmployeeStats] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
   const weekDays = [
     { value: 0, label: 'Monday' },
@@ -42,6 +48,49 @@ const Employees = () => {
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  const handleViewProfile = async (employee) => {
+    setSelectedEmployee(employee);
+    setShowProfileModal(true);
+    setLoadingProfile(true);
+    setEmployeeStats(null);
+
+    try {
+      // Fetch attendance stats for current month
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      const attendanceResponse = await attendanceAPI.getAllAttendance({
+        month: currentMonth,
+        year: currentYear
+      });
+
+      // Filter attendance for this employee
+      const employeeAttendance = attendanceResponse.data.filter(
+        (a) => a.user === employee.id
+      );
+
+      // Calculate stats
+      const presentDays = employeeAttendance.filter(a => a.status === 'present').length;
+      const absentDays = employeeAttendance.filter(a => a.status === 'absent').length;
+      const halfDays = employeeAttendance.filter(a => a.status === 'half_day').length;
+      const onLeave = employeeAttendance.filter(a => a.status === 'on_leave').length;
+      const totalHours = employeeAttendance.reduce((sum, a) => sum + (parseFloat(a.working_hours) || 0), 0);
+
+      setEmployeeStats({
+        presentDays,
+        absentDays,
+        halfDays,
+        onLeave,
+        totalHours: totalHours.toFixed(1),
+        totalRecords: employeeAttendance.length
+      });
+    } catch (error) {
+      console.error('Error fetching employee stats:', error);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -137,7 +186,12 @@ const Employees = () => {
                   <div key={employee.id} className="bg-gray-50 rounded-lg p-3 sm:p-4 border">
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <p className="font-medium text-gray-900 text-sm">{employee.name}</p>
+                        <p
+                          className="font-medium text-blue-600 text-sm cursor-pointer hover:underline"
+                          onClick={() => handleViewProfile(employee)}
+                        >
+                          {employee.name}
+                        </p>
                         <p className="text-gray-600 text-xs">{employee.mobile}</p>
                       </div>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -169,6 +223,12 @@ const Employees = () => {
                     </div>
 
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleViewProfile(employee)}
+                        className="flex-1 bg-green-100 text-green-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-green-200"
+                      >
+                        View
+                      </button>
                       <button
                         onClick={() => handleEdit(employee)}
                         className="flex-1 bg-blue-100 text-blue-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-200"
@@ -221,7 +281,10 @@ const Employees = () => {
                     {employees.map((employee) => (
                       <tr key={employee.id} className="hover:bg-gray-50">
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div
+                            className="text-sm font-medium text-blue-600 cursor-pointer hover:underline"
+                            onClick={() => handleViewProfile(employee)}
+                          >
                             {employee.name}
                           </div>
                         </td>
@@ -251,8 +314,14 @@ const Employees = () => {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm">
                           <button
+                            onClick={() => handleViewProfile(employee)}
+                            className="text-green-600 hover:text-green-800 mr-3"
+                          >
+                            View
+                          </button>
+                          <button
                             onClick={() => handleEdit(employee)}
-                            className="text-blue-600 hover:text-blue-800 mr-4"
+                            className="text-blue-600 hover:text-blue-800 mr-3"
                           >
                             Edit
                           </button>
@@ -389,6 +458,138 @@ const Employees = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Employee Profile View Modal */}
+        {showProfileModal && selectedEmployee && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-lg sm:text-xl font-bold">Employee Profile</h2>
+                <button
+                  onClick={() => setShowProfileModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Profile Header */}
+              <div className="flex items-center gap-4 mb-6 pb-4 border-b">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-blue-100 rounded-full flex items-center justify-center">
+                  {selectedEmployee.profile_photo ? (
+                    <img
+                      src={selectedEmployee.profile_photo}
+                      alt={selectedEmployee.name}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl sm:text-3xl font-bold text-blue-600">
+                      {selectedEmployee.name?.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900">{selectedEmployee.name}</h3>
+                  <p className="text-sm text-gray-600">{selectedEmployee.designation || 'Employee'}</p>
+                  <p className="text-sm text-gray-500">{selectedEmployee.department || '-'}</p>
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Contact Information</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500">Mobile</p>
+                    <p className="font-medium text-gray-900">{selectedEmployee.mobile}</p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500">Email</p>
+                    <p className="font-medium text-gray-900 truncate">{selectedEmployee.email || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Work Info */}
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Work Information</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500">Weekly Off</p>
+                    <p className="font-medium text-purple-600">{selectedEmployee.weekly_off_display || 'Sunday'}</p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500">Status</p>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      selectedEmployee.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {selectedEmployee.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* This Month Stats */}
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                  This Month's Attendance ({new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })})
+                </h4>
+
+                {loadingProfile ? (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : employeeStats ? (
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="bg-green-50 p-3 rounded-lg text-center border border-green-200">
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">{employeeStats.presentDays}</p>
+                      <p className="text-xs text-green-700">Present</p>
+                    </div>
+                    <div className="bg-red-50 p-3 rounded-lg text-center border border-red-200">
+                      <p className="text-xl sm:text-2xl font-bold text-red-600">{employeeStats.absentDays}</p>
+                      <p className="text-xs text-red-700">Absent</p>
+                    </div>
+                    <div className="bg-yellow-50 p-3 rounded-lg text-center border border-yellow-200">
+                      <p className="text-xl sm:text-2xl font-bold text-yellow-600">{employeeStats.halfDays}</p>
+                      <p className="text-xs text-yellow-700">Half Day</p>
+                    </div>
+                    <div className="bg-blue-50 p-3 rounded-lg text-center border border-blue-200">
+                      <p className="text-xl sm:text-2xl font-bold text-blue-600">{employeeStats.onLeave}</p>
+                      <p className="text-xs text-blue-700">On Leave</p>
+                    </div>
+                    <div className="bg-purple-50 p-3 rounded-lg text-center border border-purple-200 col-span-2">
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600">{employeeStats.totalHours}</p>
+                      <p className="text-xs text-purple-700">Total Hours</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No attendance data available</p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    setShowProfileModal(false);
+                    handleEdit(selectedEmployee);
+                  }}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 text-sm"
+                >
+                  Edit Employee
+                </button>
+                <button
+                  onClick={() => setShowProfileModal(false)}
+                  className="flex-1 border border-gray-300 py-2 rounded-lg hover:bg-gray-50 text-sm"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
