@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { attendanceAPI, leaveAPI, authAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -10,6 +11,7 @@ const Dashboard = () => {
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [leaveBalance, setLeaveBalance] = useState([]);
   const [compOffBalance, setCompOffBalance] = useState({ available: 0, pending: 0 });
+  const [recentLeaves, setRecentLeaves] = useState([]);
   const [offDayStats, setOffDayStats] = useState(null);
   const [adminStats, setAdminStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +29,7 @@ const Dashboard = () => {
       } else {
         promises.push(attendanceAPI.getOffDayStats({}));
         promises.push(attendanceAPI.getCompOffBalance({})); // Get comp off balance
+        promises.push(leaveAPI.getMyRequests()); // Get recent leave requests
       }
 
       const results = await Promise.all(promises);
@@ -45,6 +48,10 @@ const Dashboard = () => {
             available: results[3].data.available || 0,
             pending: results[3].data.pending_in_leaves || 0
           });
+        }
+        if (results[4]) {
+          // Get only recent 5 leave requests
+          setRecentLeaves(results[4].data.slice(0, 5));
         }
       }
     } catch (error) {
@@ -280,6 +287,83 @@ const Dashboard = () => {
             <p className="text-gray-600 text-sm">No leave balance data available.</p>
           )}
         </div>
+
+        {/* Recent Leave Requests - Employee Only */}
+        {!isAdmin && recentLeaves.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+            <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold">Recent Leave Requests</h2>
+              <Link
+                to="/leaves"
+                className="text-blue-600 hover:text-blue-800 text-sm"
+              >
+                View All →
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {recentLeaves.map((leave) => (
+                <div
+                  key={leave.id}
+                  className={`p-3 rounded-lg border ${
+                    leave.status === 'approved' ? 'bg-green-50 border-green-200' :
+                    leave.status === 'pending' ? 'bg-yellow-50 border-yellow-200' :
+                    leave.status === 'rejected' ? 'bg-red-50 border-red-200' :
+                    'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        leave.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        leave.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        leave.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {leave.status.toUpperCase()}
+                      </span>
+                      <span className="ml-2 text-sm font-medium text-gray-700">
+                        {leave.leave_type_details?.name}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {new Date(leave.start_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                      {leave.start_date !== leave.end_date && (
+                        <> - {new Date(leave.end_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Leave Breakdown */}
+                  <div className="grid grid-cols-4 gap-2 text-xs">
+                    <div className="text-center bg-white rounded p-1.5">
+                      <p className="text-gray-500">Total</p>
+                      <p className="font-bold text-gray-800">{leave.total_days}</p>
+                    </div>
+                    <div className="text-center bg-white rounded p-1.5">
+                      <p className="text-gray-500">CompOff</p>
+                      <p className="font-bold text-purple-600">{leave.comp_off_days || 0}</p>
+                    </div>
+                    <div className="text-center bg-white rounded p-1.5">
+                      <p className="text-gray-500">Paid</p>
+                      <p className="font-bold text-green-600">{leave.paid_days || 0}</p>
+                    </div>
+                    <div className="text-center bg-white rounded p-1.5">
+                      <p className="text-gray-500">LOP</p>
+                      <p className="font-bold text-red-600">{leave.lop_days || 0}</p>
+                    </div>
+                  </div>
+
+                  {/* Show remarks if rejected */}
+                  {leave.status === 'rejected' && leave.review_remarks && (
+                    <p className="mt-2 text-xs text-red-600">
+                      <span className="font-medium">Reason:</span> {leave.review_remarks}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Admin Dashboard Stats */}
         {isAdmin && adminStats && (
