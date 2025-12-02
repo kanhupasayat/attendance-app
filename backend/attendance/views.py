@@ -455,8 +455,8 @@ class AttendanceReportView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        month = request.query_params.get('month', timezone.now().month)
-        year = request.query_params.get('year', timezone.now().year)
+        month = int(request.query_params.get('month', timezone.now().month))
+        year = int(request.query_params.get('year', timezone.now().year))
 
         from accounts.models import User
         from django.db.models import Value
@@ -500,7 +500,7 @@ class AttendanceReportView(APIView):
             'total_absent': emp['total_absent'],
             'total_half_day': emp['total_half_day'],
             'total_on_leave': emp['total_on_leave'],
-            'total_working_hours': emp['total_working_hours']
+            'total_working_hours': float(emp['total_working_hours']) if emp['total_working_hours'] else 0
         } for emp in report]
 
         return Response(result)
@@ -510,8 +510,8 @@ class ExportAttendanceCSVView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        month = request.query_params.get('month', timezone.now().month)
-        year = request.query_params.get('year', timezone.now().year)
+        month = int(request.query_params.get('month', timezone.now().month))
+        year = int(request.query_params.get('year', timezone.now().year))
 
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="attendance_{year}_{month}.csv"'
@@ -555,8 +555,8 @@ class OffDayWorkStatsView(APIView):
     """Get off-day work stats for the current user"""
 
     def get(self, request):
-        month = request.query_params.get('month', timezone.now().month)
-        year = request.query_params.get('year', timezone.now().year)
+        month = int(request.query_params.get('month', timezone.now().month))
+        year = int(request.query_params.get('year', timezone.now().year))
 
         # Get all off-day attendance records for this user
         off_day_records = Attendance.objects.filter(

@@ -758,7 +758,7 @@ class ExportLeaveReportCSVView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        year = request.query_params.get('year', timezone.now().year)
+        year = int(request.query_params.get('year', timezone.now().year))
 
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="leave_report_{year}.csv"'
