@@ -35,6 +35,8 @@ class LeaveTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class MyLeaveBalanceView(APIView):
     def get(self, request):
+        from django.db.models import Sum
+
         year = int(request.query_params.get('year', timezone.now().year))
         month = int(request.query_params.get('month', timezone.now().month))
 
@@ -64,6 +66,25 @@ class MyLeaveBalanceView(APIView):
                     'lop_days': 0
                 }
             )
+
+            # Always fix total_leaves for Sick Leave (in case old data has wrong value)
+            if lt.code == 'SL' and float(balance.total_leaves) != 1:
+                balance.total_leaves = 1
+                balance.save()
+
+            # Recalculate used_leaves from approved leave requests
+            approved_paid_days = LeaveRequest.objects.filter(
+                user=request.user,
+                leave_type=lt,
+                status='approved',
+                start_date__year=year,
+                start_date__month=month
+            ).aggregate(total=Sum('paid_days'))['total'] or 0
+
+            # Update used_leaves if different
+            if float(balance.used_leaves) != float(approved_paid_days):
+                balance.used_leaves = approved_paid_days
+                balance.save()
 
             # If new month balance created, calculate carry forward from previous month
             if created and month > 1:
@@ -375,13 +396,21 @@ class ReviewLeaveRequestView(APIView):
             year = leave_request.start_date.year
             month = leave_request.start_date.month
 
+            # Set monthly quota based on leave type
+            if leave_request.leave_type.code == 'SL':
+                monthly_quota = 1
+            elif leave_request.leave_type.code == 'LOP':
+                monthly_quota = 0
+            else:
+                monthly_quota = 0  # CL and EL removed
+
             balance, created = LeaveBalance.objects.get_or_create(
                 user=leave_request.user,
                 leave_type=leave_request.leave_type,
                 year=year,
                 month=month,
                 defaults={
-                    'total_leaves': 5,
+                    'total_leaves': monthly_quota,
                     'used_leaves': 0,
                     'carried_forward': 0,
                     'lop_days': 0
