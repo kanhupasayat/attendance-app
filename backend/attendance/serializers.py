@@ -161,6 +161,27 @@ class ShiftSerializer(serializers.ModelSerializer):
     def get_employee_count(self, obj):
         return obj.employees.filter(is_active=True).count()
 
+    def validate(self, data):
+        # Get current values from instance if updating
+        instance = self.instance
+        start_time = data.get('start_time', instance.start_time if instance else None)
+        end_time = data.get('end_time', instance.end_time if instance else None)
+        break_start = data.get('break_start', instance.break_start if instance else None)
+        break_end = data.get('break_end', instance.break_end if instance else None)
+
+        # Validate break times are within shift hours
+        if break_start and break_end and start_time and end_time:
+            if break_start < start_time or break_end > end_time:
+                raise serializers.ValidationError(
+                    "Break time must be within shift hours"
+                )
+            if break_start >= break_end:
+                raise serializers.ValidationError(
+                    "Break start time must be before break end time"
+                )
+
+        return data
+
 
 class ShiftCreateSerializer(serializers.ModelSerializer):
     class Meta:
