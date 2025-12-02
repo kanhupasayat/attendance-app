@@ -176,6 +176,23 @@ export const attendanceAPI = {
   reviewWFH: (id, data) => api.post(`/attendance/wfh/review/${id}/`, data),
   cancelWFH: (id) => api.post(`/attendance/wfh/cancel/${id}/`),
   getTodayWFHStatus: () => api.get('/attendance/wfh/today-status/'),
+  // Admin Attendance Management
+  adminAddAttendance: (data) => {
+    clearCache();
+    return api.post('/attendance/admin/add/', data);
+  },
+  adminUpdateAttendance: (id, data) => {
+    clearCache();
+    return api.patch(`/attendance/admin/update/${id}/`, data);
+  },
+  adminMarkAbsent: (data) => {
+    clearCache();
+    return api.post('/attendance/admin/mark-absent/', data);
+  },
+  adminBulkUpdate: (data) => {
+    clearCache();
+    return api.post('/attendance/admin/bulk-update/', data);
+  },
 };
 
 // Leave APIs

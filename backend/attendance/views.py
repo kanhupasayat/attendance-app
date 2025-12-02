@@ -13,7 +13,8 @@ from .serializers import (
     OfficeLocationSerializer, AttendanceReportSerializer,
     RegularizationRequestSerializer, RegularizationApplySerializer,
     RegularizationReviewSerializer, WFHRequestSerializer,
-    WFHApplySerializer, WFHReviewSerializer
+    WFHApplySerializer, WFHReviewSerializer,
+    AdminAttendanceCreateSerializer, AdminAttendanceUpdateSerializer
 )
 from .utils import validate_location, validate_ip, get_client_ip
 from accounts.views import IsAdminUser
@@ -749,4 +750,234 @@ class AutoPunchOutView(APIView):
         return Response({
             "message": f"Auto punch out completed for {count} employee(s)",
             "employees": punched_out_users
+        })
+
+
+# Admin Attendance Management Views
+class AdminAttendanceCreateView(APIView):
+    """Admin can add attendance for any employee"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        serializer = AdminAttendanceCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        from accounts.models import User
+
+        user_id = serializer.validated_data['user_id']
+        date = serializer.validated_data['date']
+        punch_in_time = serializer.validated_data.get('punch_in')
+        punch_out_time = serializer.validated_data.get('punch_out')
+        attendance_status = serializer.validated_data.get('status', 'present')
+        notes = serializer.validated_data.get('notes', '')
+
+        # Verify user exists
+        try:
+            user = User.objects.get(pk=user_id, role='employee')
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Employee not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if attendance already exists for this date
+        existing = Attendance.objects.filter(user=user, date=date).first()
+        if existing:
+            return Response(
+                {"error": f"Attendance already exists for {user.name} on {date}. Use update instead."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create attendance record
+        attendance = Attendance(
+            user=user,
+            date=date,
+            status=attendance_status,
+            notes=f"Added by admin: {notes}" if notes else "Added by admin"
+        )
+
+        # Set punch times if provided
+        if punch_in_time:
+            attendance.punch_in = timezone.make_aware(
+                datetime.combine(date, punch_in_time)
+            )
+
+        if punch_out_time:
+            attendance.punch_out = timezone.make_aware(
+                datetime.combine(date, punch_out_time)
+            )
+
+        attendance.save()
+
+        return Response({
+            "message": f"Attendance added for {user.name} on {date}",
+            "data": AttendanceSerializer(attendance).data
+        }, status=status.HTTP_201_CREATED)
+
+
+class AdminAttendanceUpdateView(APIView):
+    """Admin can update any attendance record"""
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, pk):
+        try:
+            attendance = Attendance.objects.get(pk=pk)
+        except Attendance.DoesNotExist:
+            return Response(
+                {"error": "Attendance record not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = AdminAttendanceUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update fields if provided
+        if 'punch_in' in request.data:
+            punch_in_time = serializer.validated_data.get('punch_in')
+            if punch_in_time:
+                attendance.punch_in = timezone.make_aware(
+                    datetime.combine(attendance.date, punch_in_time)
+                )
+            else:
+                attendance.punch_in = None
+
+        if 'punch_out' in request.data:
+            punch_out_time = serializer.validated_data.get('punch_out')
+            if punch_out_time:
+                attendance.punch_out = timezone.make_aware(
+                    datetime.combine(attendance.date, punch_out_time)
+                )
+            else:
+                attendance.punch_out = None
+
+        if 'status' in serializer.validated_data:
+            attendance.status = serializer.validated_data['status']
+
+        if 'notes' in serializer.validated_data:
+            existing_notes = attendance.notes or ''
+            new_note = serializer.validated_data['notes']
+            attendance.notes = f"{existing_notes}\n[Admin update]: {new_note}".strip()
+
+        attendance.save()
+
+        return Response({
+            "message": "Attendance updated successfully",
+            "data": AttendanceSerializer(attendance).data
+        })
+
+
+class AdminMarkAbsentView(APIView):
+    """Admin can mark employee as absent for a specific date"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from accounts.models import User
+
+        user_id = request.data.get('user_id')
+        date_str = request.data.get('date')
+        notes = request.data.get('notes', '')
+
+        if not user_id or not date_str:
+            return Response(
+                {"error": "user_id and date are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(pk=user_id, role='employee')
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Employee not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Create or update attendance record
+        attendance, created = Attendance.objects.update_or_create(
+            user=user,
+            date=date,
+            defaults={
+                'status': 'absent',
+                'punch_in': None,
+                'punch_out': None,
+                'working_hours': 0,
+                'notes': f"Marked absent by admin: {notes}" if notes else "Marked absent by admin"
+            }
+        )
+
+        action = "marked" if created else "updated to"
+        return Response({
+            "message": f"{user.name} {action} absent on {date}",
+            "data": AttendanceSerializer(attendance).data
+        })
+
+
+class AdminBulkAttendanceView(APIView):
+    """Admin can mark multiple employees absent/present for a date"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from accounts.models import User
+
+        date_str = request.data.get('date')
+        user_ids = request.data.get('user_ids', [])
+        attendance_status = request.data.get('status', 'absent')
+        notes = request.data.get('notes', '')
+
+        if not date_str or not user_ids:
+            return Response(
+                {"error": "date and user_ids are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if attendance_status not in ['present', 'absent', 'half_day', 'on_leave']:
+            return Response(
+                {"error": "Invalid status. Use: present, absent, half_day, on_leave"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        results = []
+        for user_id in user_ids:
+            try:
+                user = User.objects.get(pk=user_id, role='employee')
+                attendance, created = Attendance.objects.update_or_create(
+                    user=user,
+                    date=date,
+                    defaults={
+                        'status': attendance_status,
+                        'notes': f"Bulk update by admin: {notes}" if notes else "Bulk update by admin"
+                    }
+                )
+                results.append({
+                    'user_id': user_id,
+                    'user_name': user.name,
+                    'status': 'success'
+                })
+            except User.DoesNotExist:
+                results.append({
+                    'user_id': user_id,
+                    'status': 'failed',
+                    'error': 'Employee not found'
+                })
+
+        return Response({
+            "message": f"Bulk attendance update completed for {date}",
+            "results": results
         })

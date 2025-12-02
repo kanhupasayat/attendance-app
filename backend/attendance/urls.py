@@ -6,7 +6,9 @@ from .views import (
     RegularizationApplyView, MyRegularizationListView, AllRegularizationListView,
     RegularizationReviewView, CancelRegularizationView,
     WFHApplyView, MyWFHListView, AllWFHListView, WFHReviewView,
-    CancelWFHView, TodayWFHStatusView, AutoPunchOutView
+    CancelWFHView, TodayWFHStatusView, AutoPunchOutView,
+    AdminAttendanceCreateView, AdminAttendanceUpdateView,
+    AdminMarkAbsentView, AdminBulkAttendanceView
 )
 
 urlpatterns = [
@@ -43,4 +45,10 @@ urlpatterns = [
 
     # Cron job endpoint (for external cron services like cron-job.org)
     path('cron/auto-punch-out/', AutoPunchOutView.as_view(), name='auto-punch-out'),
+
+    # Admin attendance management
+    path('admin/add/', AdminAttendanceCreateView.as_view(), name='admin-attendance-add'),
+    path('admin/update/<int:pk>/', AdminAttendanceUpdateView.as_view(), name='admin-attendance-update'),
+    path('admin/mark-absent/', AdminMarkAbsentView.as_view(), name='admin-mark-absent'),
+    path('admin/bulk-update/', AdminBulkAttendanceView.as_view(), name='admin-bulk-attendance'),
 ]

@@ -113,3 +113,28 @@ class WFHApplySerializer(serializers.Serializer):
 class WFHReviewSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=['approved', 'rejected'])
     review_remarks = serializers.CharField(required=False, allow_blank=True)
+
+
+# Admin Attendance Management Serializers
+class AdminAttendanceCreateSerializer(serializers.Serializer):
+    """Serializer for admin to add attendance for any employee"""
+    user_id = serializers.IntegerField()
+    date = serializers.DateField()
+    punch_in = serializers.TimeField(required=False, allow_null=True)
+    punch_out = serializers.TimeField(required=False, allow_null=True)
+    status = serializers.ChoiceField(
+        choices=['present', 'absent', 'half_day', 'on_leave'],
+        default='present'
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class AdminAttendanceUpdateSerializer(serializers.Serializer):
+    """Serializer for admin to update attendance"""
+    punch_in = serializers.TimeField(required=False, allow_null=True)
+    punch_out = serializers.TimeField(required=False, allow_null=True)
+    status = serializers.ChoiceField(
+        choices=['present', 'absent', 'half_day', 'on_leave'],
+        required=False
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
