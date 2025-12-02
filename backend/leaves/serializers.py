@@ -50,14 +50,14 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             'leave_type', 'leave_type_details',
             'start_date', 'end_date',
             'is_half_day', 'half_day_type', 'total_days',
-            'paid_days', 'lop_days',
+            'comp_off_days', 'paid_days', 'lop_days',
             'reason', 'status', 'applied_on',
             'reviewed_by', 'reviewed_by_details',
             'reviewed_on', 'review_remarks', 'is_lop',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'id', 'total_days', 'paid_days', 'lop_days',
+            'id', 'total_days', 'comp_off_days', 'paid_days', 'lop_days',
             'status', 'applied_on',
             'reviewed_by', 'reviewed_on', 'is_lop',
             'created_at', 'updated_at'

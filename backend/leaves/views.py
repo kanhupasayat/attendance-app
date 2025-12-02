@@ -85,7 +85,15 @@ class MyLeaveBalanceView(APIView):
 
 
 class LeaveApplyView(APIView):
+    """
+    Smart Leave System:
+    1. First use available Comp Off
+    2. Then use available Leave balance
+    3. Remaining days become LOP
+    """
     def post(self, request):
+        from attendance.models import CompOff
+
         serializer = LeaveApplySerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -101,7 +109,20 @@ class LeaveApplyView(APIView):
         else:
             total_days = (end_date - start_date).days + 1
 
-        # Check leave balance for the month of leave start date
+        remaining_days = total_days
+
+        # Step 1: Check available Comp Offs (earned, not expired)
+        available_comp_offs = CompOff.objects.filter(
+            user=request.user,
+            status='earned',
+            expires_on__gte=start_date  # Not expired
+        ).order_by('expires_on')  # Use earliest expiring first
+
+        total_comp_off_available = sum(float(co.credit_days) for co in available_comp_offs)
+        comp_off_days = min(remaining_days, total_comp_off_available)
+        remaining_days -= comp_off_days
+
+        # Step 2: Check leave balance for the month
         year = start_date.year
         month = start_date.month
 
@@ -141,21 +162,14 @@ class LeaveApplyView(APIView):
                 balance.carried_forward = max(0, unused)
                 balance.save()
 
-        # Calculate paid days and LOP days
-        available = float(balance.available_leaves)
-        paid_days = 0
-        lop_days = 0
-        is_lop = False
+        # Calculate paid days from leave balance
+        available_leaves = float(balance.available_leaves)
+        paid_days = min(remaining_days, available_leaves)
+        remaining_days -= paid_days
 
-        if total_days <= available:
-            # All days are paid
-            paid_days = total_days
-            lop_days = 0
-        else:
-            # Partial paid, partial LOP
-            paid_days = max(0, available)
-            lop_days = total_days - paid_days
-            is_lop = lop_days > 0
+        # Step 3: Remaining days become LOP
+        lop_days = remaining_days
+        is_lop = lop_days > 0
 
         # Check for overlapping leave requests
         overlapping = LeaveRequest.objects.filter(
@@ -179,6 +193,7 @@ class LeaveApplyView(APIView):
             is_half_day=is_half_day,
             half_day_type=serializer.validated_data.get('half_day_type', ''),
             reason=serializer.validated_data['reason'],
+            comp_off_days=comp_off_days,
             paid_days=paid_days,
             lop_days=lop_days,
             is_lop=is_lop
@@ -189,8 +204,12 @@ class LeaveApplyView(APIView):
 
         return Response({
             "message": "Leave request submitted",
-            "paid_days": paid_days,
-            "lop_days": lop_days,
+            "breakdown": {
+                "total_days": total_days,
+                "comp_off_days": comp_off_days,
+                "paid_days": paid_days,
+                "lop_days": lop_days
+            },
             "data": LeaveRequestSerializer(leave_request).data
         }, status=status.HTTP_201_CREATED)
 
@@ -280,8 +299,36 @@ class ReviewLeaveRequestView(APIView):
         leave_request.review_remarks = remarks
         leave_request.save()
 
-        # If approved, update leave balance for the month
+        # If approved, update leave balance and comp offs
         if new_status == 'approved':
+            from attendance.models import Attendance, CompOff
+
+            # Step 1: Deduct Comp Off days if used
+            if leave_request.comp_off_days > 0:
+                comp_off_to_use = float(leave_request.comp_off_days)
+                available_comp_offs = CompOff.objects.filter(
+                    user=leave_request.user,
+                    status='earned',
+                    expires_on__gte=leave_request.start_date
+                ).order_by('expires_on')
+
+                for comp_off in available_comp_offs:
+                    if comp_off_to_use <= 0:
+                        break
+                    credit = float(comp_off.credit_days)
+                    if credit <= comp_off_to_use:
+                        # Use entire comp off
+                        comp_off.status = 'used'
+                        comp_off.used_date = leave_request.start_date
+                        comp_off.save()
+                        comp_off_to_use -= credit
+                    else:
+                        # Partial use - reduce credit days
+                        comp_off.credit_days = credit - comp_off_to_use
+                        comp_off.save()
+                        comp_off_to_use = 0
+
+            # Step 2: Update leave balance
             year = leave_request.start_date.year
             month = leave_request.start_date.month
 
@@ -303,8 +350,7 @@ class ReviewLeaveRequestView(APIView):
             balance.lop_days += leave_request.lop_days
             balance.save()
 
-            # Mark attendance as on_leave for approved dates
-            from attendance.models import Attendance
+            # Step 3: Mark attendance as on_leave for approved dates
             current_date = leave_request.start_date
             while current_date <= leave_request.end_date:
                 Attendance.objects.update_or_create(

@@ -19,6 +19,8 @@ const LeaveHistory = () => {
     pending: 0,
     cancelled: 0,
     totalDays: 0,
+    compOffDays: 0,
+    paidDays: 0,
     lopDays: 0,
   });
 
@@ -61,14 +63,17 @@ const LeaveHistory = () => {
 
       setRequests(data);
 
+      const approvedRequests = data.filter(r => r.status === 'approved');
       const newStats = {
         total: data.length,
-        approved: data.filter(r => r.status === 'approved').length,
+        approved: approvedRequests.length,
         rejected: data.filter(r => r.status === 'rejected').length,
         pending: data.filter(r => r.status === 'pending').length,
         cancelled: data.filter(r => r.status === 'cancelled').length,
-        totalDays: data.filter(r => r.status === 'approved').reduce((sum, r) => sum + parseFloat(r.total_days || 0), 0),
-        lopDays: data.filter(r => r.status === 'approved').reduce((sum, r) => sum + parseFloat(r.lop_days || 0), 0),
+        totalDays: approvedRequests.reduce((sum, r) => sum + parseFloat(r.total_days || 0), 0),
+        compOffDays: approvedRequests.reduce((sum, r) => sum + parseFloat(r.comp_off_days || 0), 0),
+        paidDays: approvedRequests.reduce((sum, r) => sum + parseFloat(r.paid_days || 0), 0),
+        lopDays: approvedRequests.reduce((sum, r) => sum + parseFloat(r.lop_days || 0), 0),
       };
       setStats(newStats);
     } catch (error) {
@@ -173,9 +178,9 @@ const LeaveHistory = () => {
         </div>
 
         {/* Stats Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4">
           <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <p className="text-xs text-gray-500">Total</p>
+            <p className="text-xs text-gray-500">Total Requests</p>
             <p className="text-lg sm:text-2xl font-bold text-gray-800">{stats.total}</p>
           </div>
           <div className="bg-green-50 rounded-lg shadow-md p-3 sm:p-4 border border-green-200">
@@ -194,9 +199,21 @@ const LeaveHistory = () => {
             <p className="text-xs text-gray-500">Cancelled</p>
             <p className="text-lg sm:text-2xl font-bold text-gray-800">{stats.cancelled}</p>
           </div>
+        </div>
+
+        {/* Days Breakdown */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
           <div className="bg-blue-50 rounded-lg shadow-md p-3 sm:p-4 border border-blue-200">
             <p className="text-xs text-blue-600">Total Days</p>
             <p className="text-lg sm:text-2xl font-bold text-blue-800">{stats.totalDays}</p>
+          </div>
+          <div className="bg-purple-50 rounded-lg shadow-md p-3 sm:p-4 border border-purple-200">
+            <p className="text-xs text-purple-600">Comp Off Used</p>
+            <p className="text-lg sm:text-2xl font-bold text-purple-800">{stats.compOffDays}</p>
+          </div>
+          <div className="bg-teal-50 rounded-lg shadow-md p-3 sm:p-4 border border-teal-200">
+            <p className="text-xs text-teal-600">Paid Leaves</p>
+            <p className="text-lg sm:text-2xl font-bold text-teal-800">{stats.paidDays}</p>
           </div>
           <div className="bg-orange-50 rounded-lg shadow-md p-3 sm:p-4 border border-orange-200">
             <p className="text-xs text-orange-600">LOP Days</p>
@@ -247,10 +264,13 @@ const LeaveHistory = () => {
                         <p className="text-xs text-gray-500 truncate mb-2">
                           {request.reason}
                         </p>
-                        <div className="flex gap-3 text-xs">
+                        <div className="flex flex-wrap gap-2 text-xs">
                           <span className="text-gray-600">Total: <span className="font-medium">{request.total_days}</span></span>
                           {request.status === 'approved' && (
                             <>
+                              {parseFloat(request.comp_off_days) > 0 && (
+                                <span className="text-purple-600">CompOff: {request.comp_off_days}</span>
+                              )}
                               <span className="text-green-600">Paid: {request.paid_days || 0}</span>
                               {parseFloat(request.lop_days) > 0 && (
                                 <span className="text-red-600">LOP: {request.lop_days}</span>
@@ -298,6 +318,11 @@ const LeaveHistory = () => {
                             </div>
                             {request.status === 'approved' && (
                               <>
+                                {parseFloat(request.comp_off_days) > 0 && (
+                                  <div className="text-purple-600">
+                                    CompOff: {request.comp_off_days}
+                                  </div>
+                                )}
                                 <div className="text-green-600">
                                   Paid: {request.paid_days || 0}
                                 </div>

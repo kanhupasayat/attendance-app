@@ -78,6 +78,7 @@ class LeaveRequest(models.Model):
         blank=True
     )
     total_days = models.DecimalField(max_digits=4, decimal_places=1, default=1)
+    comp_off_days = models.DecimalField(max_digits=4, decimal_places=1, default=0, help_text="Days covered by comp off")
     paid_days = models.DecimalField(max_digits=4, decimal_places=1, default=0)
     lop_days = models.DecimalField(max_digits=4, decimal_places=1, default=0)
     reason = models.TextField()
