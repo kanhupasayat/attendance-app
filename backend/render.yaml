@@ -16,6 +16,25 @@ services:
       - key: PYTHON_VERSION
         value: "3.11.0"
 
+  # Cron job for auto punch-out at 11 PM IST (5:30 PM UTC)
+  - type: cron
+    name: auto-punch-out
+    env: python
+    schedule: "30 17 * * *"
+    buildCommand: "./build.sh"
+    startCommand: "python manage.py auto_punch_out"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: attendance-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+
 databases:
   - name: attendance-db
     databaseName: attendance
