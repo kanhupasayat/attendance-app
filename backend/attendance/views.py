@@ -34,6 +34,9 @@ from accounts.utils import (
 
 class PunchInView(APIView):
     def post(self, request):
+        from leaves.models import LeaveRequest, LeaveBalance
+        from django.db.models import Sum
+
         serializer = PunchInSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -84,6 +87,19 @@ class PunchInView(APIView):
         current_weekday = today.weekday()
         is_off_day = (current_weekday == request.user.weekly_off)
 
+        # AUTO LEAVE CANCEL: Check if employee has approved leave for today
+        leave_cancelled_msg = ""
+        approved_leave = LeaveRequest.objects.filter(
+            user=request.user,
+            status='approved',
+            start_date__lte=today,
+            end_date__gte=today
+        ).first()
+
+        if approved_leave:
+            # Employee has approved leave but came to office - handle leave adjustment
+            leave_cancelled_msg = self.handle_leave_on_punch_in(approved_leave, today)
+
         if existing:
             # Update existing record
             existing.punch_in = timezone.now()
@@ -108,10 +124,205 @@ class PunchInView(APIView):
             )
 
         msg = "Punch in successful (Work From Home)" if is_wfh else "Punch in successful"
+        if leave_cancelled_msg:
+            msg += f". {leave_cancelled_msg}"
+
         return Response({
             "message": msg,
             "data": AttendanceSerializer(attendance).data
         }, status=status.HTTP_201_CREATED)
+
+    def handle_leave_on_punch_in(self, leave_request, today):
+        """
+        Handle leave adjustment when employee punches in during approved leave.
+
+        Cases:
+        1. Single day leave (start == end == today) -> Cancel entire leave
+        2. First day of multi-day leave (start == today) -> Shrink leave (start = today + 1)
+        3. Last day of multi-day leave (end == today) -> Shrink leave (end = today - 1)
+        4. Middle day of multi-day leave -> Split into two leaves
+        """
+        from leaves.models import LeaveRequest, LeaveBalance
+        from django.db.models import Sum
+        from datetime import timedelta
+
+        start_date = leave_request.start_date
+        end_date = leave_request.end_date
+
+        # Calculate original days
+        original_total_days = float(leave_request.total_days)
+
+        if start_date == end_date == today:
+            # Case 1: Single day leave - cancel entirely
+            leave_request.status = 'cancelled'
+            leave_request.review_remarks = f"Auto-cancelled: Employee punched in on {today}"
+            leave_request.save()
+
+            # Restore leave balance
+            self.restore_leave_balance(leave_request)
+            return "Your 1 day leave has been auto-cancelled"
+
+        elif start_date == today:
+            # Case 2: First day of multi-day leave - shrink from start
+            new_start = today + timedelta(days=1)
+            new_total_days = (end_date - new_start).days + 1
+            if leave_request.is_half_day:
+                new_total_days = 0.5
+
+            # Recalculate paid/comp-off/lop for reduced days
+            self.recalculate_leave_days(leave_request, new_total_days, new_start, end_date)
+            leave_request.start_date = new_start
+            leave_request.review_remarks = f"Auto-adjusted: Employee punched in on {today}. Original: {start_date} to {end_date}"
+            leave_request.save()
+
+            return f"Leave adjusted: Now {new_start} to {end_date} ({new_total_days} days)"
+
+        elif end_date == today:
+            # Case 3: Last day of multi-day leave - shrink from end
+            new_end = today - timedelta(days=1)
+            new_total_days = (new_end - start_date).days + 1
+            if leave_request.is_half_day:
+                new_total_days = 0.5
+
+            # Recalculate paid/comp-off/lop for reduced days
+            self.recalculate_leave_days(leave_request, new_total_days, start_date, new_end)
+            leave_request.end_date = new_end
+            leave_request.review_remarks = f"Auto-adjusted: Employee punched in on {today}. Original: {start_date} to {end_date}"
+            leave_request.save()
+
+            return f"Leave adjusted: Now {start_date} to {new_end} ({new_total_days} days)"
+
+        else:
+            # Case 4: Middle day - split into two leaves
+            # First part: start_date to (today - 1)
+            first_end = today - timedelta(days=1)
+            first_total_days = (first_end - start_date).days + 1
+
+            # Second part: (today + 1) to end_date
+            second_start = today + timedelta(days=1)
+            second_total_days = (end_date - second_start).days + 1
+
+            # Update original leave to first part
+            self.recalculate_leave_days(leave_request, first_total_days, start_date, first_end)
+            leave_request.end_date = first_end
+            leave_request.review_remarks = f"Auto-split: Employee punched in on {today}. Original: {start_date} to {end_date}"
+            leave_request.save()
+
+            # Create new leave for second part
+            if second_total_days > 0:
+                # Calculate days for second leave
+                second_leave = LeaveRequest.objects.create(
+                    user=leave_request.user,
+                    leave_type=leave_request.leave_type,
+                    start_date=second_start,
+                    end_date=end_date,
+                    reason=leave_request.reason,
+                    status='approved',
+                    is_half_day=False,
+                    total_days=second_total_days,
+                    comp_off_days=0,
+                    paid_days=0,
+                    lop_days=0,
+                    reviewed_by=leave_request.reviewed_by,
+                    review_remarks=f"Auto-created from split: Original leave {start_date} to {end_date}"
+                )
+                # Recalculate days for second leave
+                self.recalculate_leave_days(second_leave, second_total_days, second_start, end_date)
+                second_leave.save()
+
+                return f"Leave split: {start_date} to {first_end} ({first_total_days} days) + {second_start} to {end_date} ({second_total_days} days). {today} cancelled."
+
+            return f"Leave adjusted: Now {start_date} to {first_end} ({first_total_days} days)"
+
+    def recalculate_leave_days(self, leave_request, new_total_days, new_start, new_end):
+        """
+        Recalculate comp_off_days, paid_days, and lop_days for adjusted leave.
+        Uses Smart Leave System: Comp Off first, then Paid, then LOP.
+        """
+        from leaves.models import LeaveBalance, LeaveRequest
+        from django.db.models import Sum
+
+        user = leave_request.user
+        leave_type = leave_request.leave_type
+        year = new_start.year
+        month = new_start.month
+
+        # Get available comp off (status='earned' means not used)
+        available_comp_off = CompOff.objects.filter(
+            user=user,
+            status='earned',
+            earned_date__lte=new_end
+        ).count()
+
+        # Get leave balance for this month
+        balance = LeaveBalance.objects.filter(
+            user=user,
+            leave_type=leave_type,
+            year=year,
+            month=month
+        ).first()
+
+        available_paid = 0
+        if balance:
+            # Get already used paid days (excluding current leave being adjusted)
+            already_used = LeaveRequest.objects.filter(
+                user=user,
+                leave_type=leave_type,
+                status='approved',
+                start_date__year=year,
+                start_date__month=month
+            ).exclude(id=leave_request.id).aggregate(total=Sum('paid_days'))['total'] or 0
+
+            available_paid = float(balance.total_leaves) + float(balance.carried_forward) - float(already_used)
+            available_paid = max(0, available_paid)
+
+        remaining_days = float(new_total_days)
+
+        # 1. Use Comp Off first
+        comp_off_to_use = min(available_comp_off, remaining_days)
+        remaining_days -= comp_off_to_use
+
+        # 2. Use Paid leaves
+        paid_to_use = min(available_paid, remaining_days)
+        remaining_days -= paid_to_use
+
+        # 3. Remaining is LOP
+        lop_days = remaining_days
+
+        # Update leave request
+        old_comp_off = float(leave_request.comp_off_days or 0)
+
+        leave_request.total_days = new_total_days
+        leave_request.comp_off_days = comp_off_to_use
+        leave_request.paid_days = paid_to_use
+        leave_request.lop_days = lop_days
+
+        # Restore excess comp offs that were used
+        comp_off_to_restore = old_comp_off - comp_off_to_use
+        if comp_off_to_restore > 0:
+            # Mark some comp offs as earned (restore them)
+            used_comp_offs = CompOff.objects.filter(
+                user=user,
+                status='used'
+            ).order_by('-used_date')[:int(comp_off_to_restore)]
+            for co in used_comp_offs:
+                co.status = 'earned'
+                co.used_date = None
+                co.save()
+
+    def restore_leave_balance(self, leave_request):
+        """Restore leave balance when leave is cancelled"""
+        # Restore comp offs used in this leave
+        comp_off_to_restore = int(float(leave_request.comp_off_days or 0))
+        if comp_off_to_restore > 0:
+            used_comp_offs = CompOff.objects.filter(
+                user=leave_request.user,
+                status='used'
+            ).order_by('-used_date')[:comp_off_to_restore]
+            for co in used_comp_offs:
+                co.status = 'earned'
+                co.used_date = None
+                co.save()
 
 
 class PunchOutView(APIView):
