@@ -203,5 +203,10 @@ def notify_all_employees_holiday(holiday):
         )
     Notification.objects.bulk_create(notifications)
 
+    # Get employee emails as a list (not queryset) for async thread
+    employee_emails = list(employees.filter(email__isnull=False).exclude(email='').values_list('email', flat=True))
+    holiday_name = holiday.name
+    holiday_date = holiday.date
+
     # Send email notifications (async)
-    send_email_async(send_holiday_notification_email, holiday, employees)
+    send_email_async(send_holiday_notification_email, holiday_name, holiday_date, employee_emails)

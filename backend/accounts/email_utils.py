@@ -268,20 +268,20 @@ Status: {status_text}
 
 # ================== HOLIDAY NOTIFICATIONS ==================
 
-def send_holiday_notification_email(holiday, employees):
+def send_holiday_notification_email(holiday_name, holiday_date, employee_emails):
     """
     Send email to all employees when a new holiday is added
     """
     frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-    subject = f"Holiday Announcement: {holiday.name}"
+    subject = f"Holiday Announcement: {holiday_name}"
 
-    date_str = holiday.date.strftime('%d %b %Y')
-    day_name = holiday.date.strftime('%A')
+    date_str = holiday_date.strftime('%d %b %Y')
+    day_name = holiday_date.strftime('%A')
 
     message = f"""
 Holiday Announcement
 
-Office will remain closed on {date_str} ({day_name}) for {holiday.name}.
+Office will remain closed on {date_str} ({day_name}) for {holiday_name}.
 
 Enjoy your holiday!
 
@@ -289,6 +289,5 @@ View holiday calendar: {frontend_url}/holidays
     """
 
     # Send email to each employee
-    for employee in employees:
-        if employee.email:
-            send_email_notification(subject, message, employee.email)
+    for email in employee_emails:
+        send_email_notification(subject, message, email)
