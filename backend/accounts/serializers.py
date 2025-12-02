@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
             'shift', 'shift_name',
             'date_joined', 'is_active', 'is_admin', 'photo_url'
         ]
-        read_only_fields = ['id', 'date_joined']
+        read_only_fields = ['id', 'date_joined', 'shift']
 
     def get_weekly_off_display(self, obj):
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -61,7 +61,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             # Status
             'has_pending_update'
         ]
-        read_only_fields = ['id', 'date_joined', 'role', 'is_admin']
+        read_only_fields = ['id', 'date_joined', 'role', 'is_admin', 'shift']
 
     def get_weekly_off_display(self, obj):
         days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
