@@ -40,15 +40,22 @@ class MyLeaveBalanceView(APIView):
         year = int(request.query_params.get('year', timezone.now().year))
         month = int(request.query_params.get('month', timezone.now().month))
 
+        # Calculate TOTAL LOP across ALL leave types for this month
+        total_lop_this_month = LeaveRequest.objects.filter(
+            user=request.user,
+            status='approved',
+            start_date__year=year,
+            start_date__month=month
+        ).aggregate(total=Sum('lop_days'))['total'] or 0
+
         # Get or create balance for current month
         # Only show Sick Leave (SL) - CL and EL are removed from system
-        leave_types = LeaveType.objects.filter(is_active=True, code__in=['SL', 'LOP'])
+        leave_types = LeaveType.objects.filter(is_active=True, code__in=['SL'])
         balances = []
 
         for lt in leave_types:
             # Set monthly quota based on leave type
             # Sick Leave (SL) = 1 per month
-            # LOP = 0 (no quota)
             if lt.code == 'SL':
                 monthly_quota = 1
             else:
@@ -72,27 +79,23 @@ class MyLeaveBalanceView(APIView):
                 balance.total_leaves = 1
                 balance.save()
 
-            # Recalculate used_leaves and lop_days from approved leave requests
-            approved_data = LeaveRequest.objects.filter(
+            # Recalculate used_leaves from approved leave requests for this leave type
+            approved_paid_days = LeaveRequest.objects.filter(
                 user=request.user,
                 leave_type=lt,
                 status='approved',
                 start_date__year=year,
                 start_date__month=month
-            ).aggregate(
-                total_paid=Sum('paid_days'),
-                total_lop=Sum('lop_days')
-            )
-            approved_paid_days = approved_data['total_paid'] or 0
-            approved_lop_days = approved_data['total_lop'] or 0
+            ).aggregate(total=Sum('paid_days'))['total'] or 0
 
-            # Update used_leaves and lop_days if different
+            # Update used_leaves if different
+            # Store TOTAL LOP (across all leave types) in this balance for display
             needs_save = False
             if float(balance.used_leaves) != float(approved_paid_days):
                 balance.used_leaves = approved_paid_days
                 needs_save = True
-            if float(balance.lop_days) != float(approved_lop_days):
-                balance.lop_days = approved_lop_days
+            if float(balance.lop_days) != float(total_lop_this_month):
+                balance.lop_days = total_lop_this_month
                 needs_save = True
             if needs_save:
                 balance.save()
