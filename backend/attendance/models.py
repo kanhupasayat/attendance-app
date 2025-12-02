@@ -1,6 +1,19 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from datetime import time, timedelta
+
+# Office Configuration
+OFFICE_START_TIME = time(10, 0)  # 10:00 AM
+OFFICE_END_TIME = time(19, 0)    # 7:00 PM
+BREAK_START_TIME = time(14, 0)   # 2:00 PM
+BREAK_END_TIME = time(15, 0)     # 3:00 PM
+BREAK_DURATION_HOURS = 1         # 1 hour break
+
+# Working hours configuration
+FULL_DAY_HOURS = 8               # 8 hours = full day (9 hours - 1 hour break)
+HALF_DAY_MIN_HOURS = 4           # Minimum 4 hours for half day
+HALF_DAY_MAX_HOURS = 6           # Less than 6 hours = half day
 
 
 class Attendance(models.Model):
@@ -50,18 +63,55 @@ class Attendance(models.Model):
         ordering = ['-date', '-punch_in']
 
     def calculate_working_hours(self):
+        """
+        Calculate working hours with break deduction.
+        Office: 10 AM - 7 PM (9 hours)
+        Break: 2 PM - 3 PM (1 hour)
+        Effective working: 8 hours
+        """
         if self.punch_in and self.punch_out:
             delta = self.punch_out - self.punch_in
-            hours = delta.total_seconds() / 3600
-            self.working_hours = round(hours, 2)
+            total_hours = delta.total_seconds() / 3600
+
+            # Deduct break time if worked through break period
+            punch_in_time = self.punch_in.time()
+            punch_out_time = self.punch_out.time()
+
+            # Check if work period overlaps with break time
+            if punch_in_time < BREAK_END_TIME and punch_out_time > BREAK_START_TIME:
+                # Calculate overlap with break period
+                break_start = max(punch_in_time, BREAK_START_TIME)
+                break_end = min(punch_out_time, BREAK_END_TIME)
+
+                if break_start < break_end:
+                    # There is overlap, deduct break time
+                    total_hours -= BREAK_DURATION_HOURS
+
+            self.working_hours = round(max(0, total_hours), 2)
             return self.working_hours
         return 0
+
+    def determine_status(self):
+        """
+        Determine attendance status based on working hours.
+        - >= 6 hours: Present (full day)
+        - 4 to < 6 hours: Half Day
+        - < 4 hours: Half Day (could be treated as absent based on policy)
+        """
+        if self.working_hours >= HALF_DAY_MAX_HOURS:
+            return 'present'
+        elif self.working_hours >= HALF_DAY_MIN_HOURS:
+            return 'half_day'
+        else:
+            # Less than 4 hours - mark as half day (you can change to 'absent' if needed)
+            return 'half_day'
 
     def save(self, *args, **kwargs):
         if self.punch_in and self.punch_out:
             self.calculate_working_hours()
-            if self.working_hours < 4:
-                self.status = 'half_day'
+            # Only auto-set status if it's currently 'present' (don't override on_leave, absent set by admin)
+            if self.status == 'present':
+                self.status = self.determine_status()
         super().save(*args, **kwargs)
 
     def __str__(self):
