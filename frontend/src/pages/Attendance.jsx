@@ -1,15 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
-import { attendanceAPI } from '../services/api';
+import { attendanceAPI, authAPI } from '../services/api';
 import Layout from '../components/Layout';
 
 const Attendance = () => {
   const { isAdmin } = useAuth();
   const [attendance, setAttendance] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
+
+  // Admin modal states
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    user_id: '',
+    date: new Date().toISOString().split('T')[0],
+    punch_in: '',
+    punch_out: '',
+    status: 'present',
+    notes: '',
+  });
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -25,8 +41,20 @@ const Attendance = () => {
     }
   };
 
+  const fetchEmployees = async () => {
+    if (isAdmin) {
+      try {
+        const response = await authAPI.getEmployees();
+        setEmployees(response.data);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      }
+    }
+  };
+
   useEffect(() => {
     fetchAttendance();
+    fetchEmployees();
   }, [month, year, isAdmin]);
 
   const formatDate = (date) => {
@@ -34,13 +62,6 @@ const Attendance = () => {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
-    });
-  };
-
-  const formatDateShort = (date) => {
-    return new Date(date).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
     });
   };
 
@@ -71,6 +92,92 @@ const Attendance = () => {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Admin functions
+  const openAddModal = () => {
+    setModalMode('add');
+    setEditingRecord(null);
+    setFormData({
+      user_id: employees.length > 0 ? employees[0].id : '',
+      date: new Date().toISOString().split('T')[0],
+      punch_in: '',
+      punch_out: '',
+      status: 'present',
+      notes: '',
+    });
+    setShowModal(true);
+  };
+
+  const openEditModal = (record) => {
+    setModalMode('edit');
+    setEditingRecord(record);
+
+    // Extract time from datetime
+    const punchInTime = record.punch_in ? new Date(record.punch_in).toTimeString().slice(0, 5) : '';
+    const punchOutTime = record.punch_out ? new Date(record.punch_out).toTimeString().slice(0, 5) : '';
+
+    setFormData({
+      user_id: record.user,
+      date: record.date,
+      punch_in: punchInTime,
+      punch_out: punchOutTime,
+      status: record.status,
+      notes: '',
+    });
+    setShowModal(true);
+  };
+
+  const handleMarkAbsent = async (record) => {
+    if (!confirm(`Mark ${record.user_details?.name} as absent on ${formatDate(record.date)}?`)) {
+      return;
+    }
+
+    try {
+      await attendanceAPI.adminMarkAbsent({
+        user_id: record.user,
+        date: record.date,
+        notes: 'Marked absent by admin'
+      });
+      toast.success('Marked as absent');
+      fetchAttendance();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to mark absent');
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      if (modalMode === 'add') {
+        await attendanceAPI.adminAddAttendance({
+          user_id: parseInt(formData.user_id),
+          date: formData.date,
+          punch_in: formData.punch_in || null,
+          punch_out: formData.punch_out || null,
+          status: formData.status,
+          notes: formData.notes,
+        });
+        toast.success('Attendance added successfully');
+      } else {
+        await attendanceAPI.adminUpdateAttendance(editingRecord.id, {
+          punch_in: formData.punch_in || null,
+          punch_out: formData.punch_out || null,
+          status: formData.status,
+          notes: formData.notes,
+        });
+        toast.success('Attendance updated successfully');
+      }
+
+      setShowModal(false);
+      fetchAttendance();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Operation failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
@@ -81,12 +188,22 @@ const Attendance = () => {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
                 {isAdmin ? 'All Attendance' : 'My Attendance'}
               </h1>
-              <Link
-                to="/regularization"
-                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-center text-sm sm:text-base transition-colors"
-              >
-                Regularization
-              </Link>
+              <div className="flex gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={openAddModal}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-center text-sm sm:text-base transition-colors"
+                  >
+                    + Add Attendance
+                  </button>
+                )}
+                <Link
+                  to="/regularization"
+                  className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-center text-sm sm:text-base transition-colors"
+                >
+                  Regularization
+                </Link>
+              </div>
             </div>
 
             {/* Filters */}
@@ -129,7 +246,17 @@ const Attendance = () => {
                         )}
                         <p className="text-gray-600 text-xs">{formatDate(record.date)}</p>
                       </div>
-                      {getStatusBadge(record.status, true)}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(record.status, true)}
+                        {isAdmin && (
+                          <button
+                            onClick={() => openEditModal(record)}
+                            className="text-blue-600 hover:text-blue-800 text-xs"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div>
@@ -150,6 +277,14 @@ const Attendance = () => {
                         <p className="font-medium text-blue-600">{record.working_hours || '-'}</p>
                       </div>
                     </div>
+                    {isAdmin && record.status !== 'absent' && (
+                      <button
+                        onClick={() => handleMarkAbsent(record)}
+                        className="mt-2 text-xs text-red-600 hover:text-red-800"
+                      >
+                        Mark Absent
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -179,6 +314,11 @@ const Attendance = () => {
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
+                      {isAdmin && (
+                        <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -212,6 +352,24 @@ const Attendance = () => {
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(record.status)}
                         </td>
+                        {isAdmin && (
+                          <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm">
+                            <button
+                              onClick={() => openEditModal(record)}
+                              className="text-blue-600 hover:text-blue-800 mr-3"
+                            >
+                              Edit
+                            </button>
+                            {record.status !== 'absent' && (
+                              <button
+                                onClick={() => handleMarkAbsent(record)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Absent
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -225,6 +383,136 @@ const Attendance = () => {
           )}
         </div>
       </div>
+
+      {/* Admin Add/Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {modalMode === 'add' ? 'Add Attendance' : 'Edit Attendance'}
+            </h2>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {modalMode === 'add' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Employee *
+                  </label>
+                  <select
+                    value={formData.user_id}
+                    onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Select Employee</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.mobile})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {modalMode === 'edit' && (
+                <div className="bg-gray-100 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600">Employee</p>
+                  <p className="font-medium">{editingRecord?.user_details?.name}</p>
+                  <p className="text-sm text-gray-500">{editingRecord?.date}</p>
+                </div>
+              )}
+
+              {modalMode === 'add' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Punch In
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.punch_in}
+                    onChange={(e) => setFormData({ ...formData, punch_in: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Punch Out
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.punch_out}
+                    onChange={(e) => setFormData({ ...formData, punch_out: e.target.value })}
+                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status *
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="present">Present</option>
+                  <option value="absent">Absent</option>
+                  <option value="half_day">Half Day</option>
+                  <option value="on_leave">On Leave</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows="2"
+                  placeholder="Optional notes..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Saving...' : (modalMode === 'add' ? 'Add' : 'Update')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
