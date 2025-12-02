@@ -459,33 +459,34 @@ class AttendanceReportView(APIView):
         year = int(request.query_params.get('year', timezone.now().year))
 
         from accounts.models import User
-        from django.db.models import Value
+        from django.db.models import Value, DecimalField
         from django.db.models.functions import Coalesce
+        from decimal import Decimal
 
         # Single optimized query with annotation - eliminates N+1 problem
         report = User.objects.filter(
             role='employee', is_active=True
         ).annotate(
             total_present=Count(
-                'attendance',
-                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='present')
+                'attendances',
+                filter=Q(attendances__date__month=month, attendances__date__year=year, attendances__status='present')
             ),
             total_absent=Count(
-                'attendance',
-                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='absent')
+                'attendances',
+                filter=Q(attendances__date__month=month, attendances__date__year=year, attendances__status='absent')
             ),
             total_half_day=Count(
-                'attendance',
-                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='half_day')
+                'attendances',
+                filter=Q(attendances__date__month=month, attendances__date__year=year, attendances__status='half_day')
             ),
             total_on_leave=Count(
-                'attendance',
-                filter=Q(attendance__date__month=month, attendance__date__year=year, attendance__status='on_leave')
+                'attendances',
+                filter=Q(attendances__date__month=month, attendances__date__year=year, attendances__status='on_leave')
             ),
             total_working_hours=Coalesce(
-                Sum('attendance__working_hours',
-                    filter=Q(attendance__date__month=month, attendance__date__year=year)),
-                Value(0)
+                Sum('attendances__working_hours',
+                    filter=Q(attendances__date__month=month, attendances__date__year=year)),
+                Value(Decimal('0'), output_field=DecimalField())
             )
         ).values(
             'id', 'name', 'total_present', 'total_absent',
