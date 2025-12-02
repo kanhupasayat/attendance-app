@@ -228,9 +228,10 @@ const Dashboard = () => {
             )}
           </h2>
 
-          {/* Comp Off Balance Card - Show first */}
+          {/* Comp Off and LOP Summary Cards */}
           {!isAdmin && (
-            <div className="mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              {/* Comp Off Balance Card */}
               <div className="bg-purple-50 rounded-lg p-3 sm:p-4 border border-purple-200">
                 <div className="flex justify-between items-start">
                   <div>
@@ -249,6 +250,24 @@ const Dashboard = () => {
                         {compOffBalance.pending} pending in requests
                       </p>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* LOP Summary Card */}
+              <div className="bg-red-50 rounded-lg p-3 sm:p-4 border border-red-200">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-red-800 text-xs sm:text-sm">
+                      Loss of Pay (LOP)
+                    </h3>
+                    <p className="text-2xl sm:text-3xl font-bold text-red-600 mt-1 sm:mt-2">
+                      {leaveBalance.reduce((total, b) => total + parseFloat(b.lop_days || 0), 0)}
+                    </p>
+                    <p className="text-xs text-red-500">Days this month</p>
+                  </div>
+                  <div className="text-right text-xs text-red-600">
+                    <p>Salary will be deducted</p>
                   </div>
                 </div>
               </div>
