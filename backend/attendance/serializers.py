@@ -171,6 +171,25 @@ class ShiftCreateSerializer(serializers.ModelSerializer):
             'grace_period_minutes', 'is_active'
         ]
 
+    def validate(self, data):
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        break_start = data.get('break_start')
+        break_end = data.get('break_end')
+
+        # Validate break times are within shift hours
+        if break_start and break_end and start_time and end_time:
+            if break_start < start_time or break_end > end_time:
+                raise serializers.ValidationError(
+                    "Break time must be within shift hours"
+                )
+            if break_start >= break_end:
+                raise serializers.ValidationError(
+                    "Break start time must be before break end time"
+                )
+
+        return data
+
 
 # Comp Off Serializers
 class CompOffSerializer(serializers.ModelSerializer):

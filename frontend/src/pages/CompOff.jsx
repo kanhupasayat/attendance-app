@@ -129,7 +129,11 @@ const CompOff = () => {
 
   const getMinUseDate = () => {
     const today = new Date();
-    return today.toISOString().split('T')[0];
+    // Use local date instead of UTC to handle timezone correctly
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   return (

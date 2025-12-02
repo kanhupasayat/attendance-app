@@ -195,14 +195,14 @@ class Attendance(models.Model):
         Determine attendance status based on working hours.
         - >= 6 hours: Present (full day)
         - 4 to < 6 hours: Half Day
-        - < 4 hours: Half Day
+        - < 4 hours: Absent
         """
         if self.working_hours >= HALF_DAY_MAX_HOURS:
             return 'present'
         elif self.working_hours >= HALF_DAY_MIN_HOURS:
             return 'half_day'
         else:
-            return 'half_day'
+            return 'absent'
 
     def is_late(self):
         """Check if employee punched in late (after shift start + grace period)"""

@@ -361,11 +361,11 @@ class RegularizationApplyView(APIView):
         requested_punch_out = serializer.validated_data.get('requested_punch_out')
         reason = serializer.validated_data['reason']
 
-        # Cannot apply regularization for today or future dates
+        # Cannot apply regularization for future dates (today is allowed)
         today = timezone.now().date()
-        if date >= today:
+        if date > today:
             return Response(
-                {"error": "Regularization can only be applied for past dates"},
+                {"error": "Regularization cannot be applied for future dates"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
