@@ -223,10 +223,14 @@ const Leaves = () => {
                       <span>{formatDateShort(request.end_date)}</span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                    <div className="grid grid-cols-4 gap-2 text-xs mb-2">
                       <div className="text-center bg-white rounded p-1.5 border">
                         <p className="text-gray-500">Total</p>
                         <p className="font-medium">{request.total_days}{request.is_half_day && ' (H)'}</p>
+                      </div>
+                      <div className="text-center bg-white rounded p-1.5 border">
+                        <p className="text-gray-500">CompOff</p>
+                        <p className="font-medium text-purple-600">{request.comp_off_days || 0}</p>
                       </div>
                       <div className="text-center bg-white rounded p-1.5 border">
                         <p className="text-gray-500">Paid</p>
@@ -304,6 +308,9 @@ const Leaves = () => {
                         Total
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        CompOff
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Paid
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -347,6 +354,9 @@ const Leaves = () => {
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           {request.total_days}
                           {request.is_half_day && ' (Half)'}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600 font-medium">
+                          {request.comp_off_days || 0}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
                           {request.paid_days || 0}
