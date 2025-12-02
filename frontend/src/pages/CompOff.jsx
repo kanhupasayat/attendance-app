@@ -315,17 +315,6 @@ const CompOff = () => {
                   {compOff.reason && (
                     <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded">{compOff.reason}</p>
                   )}
-                  {compOff.status === 'earned' && !isAdmin && (
-                    <button
-                      onClick={() => {
-                        setSelectedCompOff(compOff);
-                        setShowUseModal(true);
-                      }}
-                      className="w-full bg-green-100 text-green-700 px-3 py-2 rounded text-sm font-medium hover:bg-green-200"
-                    >
-                      Use Comp Off
-                    </button>
-                  )}
                 </div>
               ))}
             </div>
@@ -355,11 +344,6 @@ const CompOff = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Status
                     </th>
-                    {!isAdmin && (
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Action
-                      </th>
-                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -393,21 +377,6 @@ const CompOff = () => {
                           {compOff.status}
                         </span>
                       </td>
-                      {!isAdmin && (
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {compOff.status === 'earned' && (
-                            <button
-                              onClick={() => {
-                                setSelectedCompOff(compOff);
-                                setShowUseModal(true);
-                              }}
-                              className="text-green-600 hover:text-green-800 font-medium text-sm"
-                            >
-                              Use
-                            </button>
-                          )}
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>
