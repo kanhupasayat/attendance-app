@@ -17,7 +17,9 @@ from accounts.utils import notify_leave_applied, notify_leave_status
 
 class LeaveTypeListView(generics.ListCreateAPIView):
     serializer_class = LeaveTypeSerializer
-    queryset = LeaveType.objects.filter(is_active=True)
+    # Only show Sick Leave (SL) - CL and EL are removed
+    # LOP is shown but with 0 quota (for tracking purposes)
+    queryset = LeaveType.objects.filter(is_active=True, code__in=['SL', 'LOP'])
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -37,19 +39,18 @@ class MyLeaveBalanceView(APIView):
         month = int(request.query_params.get('month', timezone.now().month))
 
         # Get or create balance for current month
-        leave_types = LeaveType.objects.filter(is_active=True)
+        # Only show Sick Leave (SL) - CL and EL are removed from system
+        leave_types = LeaveType.objects.filter(is_active=True, code__in=['SL', 'LOP'])
         balances = []
 
         for lt in leave_types:
             # Set monthly quota based on leave type
             # Sick Leave (SL) = 1 per month
-            # Others = 5 per month (or use annual_quota / 12)
+            # LOP = 0 (no quota)
             if lt.code == 'SL':
                 monthly_quota = 1
-            elif lt.code == 'LOP':
-                monthly_quota = 0
             else:
-                monthly_quota = 5
+                monthly_quota = 0
 
             balance, created = LeaveBalance.objects.get_or_create(
                 user=request.user,
