@@ -88,11 +88,12 @@ class LeaveApplyView(APIView):
     """
     Smart Leave System:
     1. First use available Comp Off
-    2. Then use available Leave balance
+    2. Then use available Leave balance (minus pending requests)
     3. Remaining days become LOP
     """
     def post(self, request):
         from attendance.models import CompOff
+        from django.db.models import Sum
 
         serializer = LeaveApplySerializer(data=request.data)
         if not serializer.is_valid():
@@ -112,6 +113,12 @@ class LeaveApplyView(APIView):
         remaining_days = total_days
 
         # Step 1: Check available Comp Offs (earned, not expired)
+        # Also check comp offs not already reserved in pending requests
+        pending_comp_off_days = LeaveRequest.objects.filter(
+            user=request.user,
+            status='pending'
+        ).aggregate(total=Sum('comp_off_days'))['total'] or 0
+
         available_comp_offs = CompOff.objects.filter(
             user=request.user,
             status='earned',
@@ -119,6 +126,9 @@ class LeaveApplyView(APIView):
         ).order_by('expires_on')  # Use earliest expiring first
 
         total_comp_off_available = sum(float(co.credit_days) for co in available_comp_offs)
+        # Subtract already pending comp off days
+        total_comp_off_available = max(0, total_comp_off_available - float(pending_comp_off_days))
+
         comp_off_days = min(remaining_days, total_comp_off_available)
         remaining_days -= comp_off_days
 
@@ -162,8 +172,18 @@ class LeaveApplyView(APIView):
                 balance.carried_forward = max(0, unused)
                 balance.save()
 
-        # Calculate paid days from leave balance
-        available_leaves = float(balance.available_leaves)
+        # Calculate pending leaves for this leave type
+        pending_paid_days = LeaveRequest.objects.filter(
+            user=request.user,
+            leave_type=leave_type,
+            status='pending',
+            start_date__year=year,
+            start_date__month=month
+        ).aggregate(total=Sum('paid_days'))['total'] or 0
+
+        # Calculate paid days from leave balance (minus pending)
+        available_leaves = float(balance.available_leaves) - float(pending_paid_days)
+        available_leaves = max(0, available_leaves)
         paid_days = min(remaining_days, available_leaves)
         remaining_days -= paid_days
 

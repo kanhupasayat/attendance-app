@@ -9,6 +9,7 @@ const Dashboard = () => {
   const { user, isAdmin } = useAuth();
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [leaveBalance, setLeaveBalance] = useState([]);
+  const [compOffBalance, setCompOffBalance] = useState({ available: 0, pending: 0 });
   const [offDayStats, setOffDayStats] = useState(null);
   const [adminStats, setAdminStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +26,7 @@ const Dashboard = () => {
         promises.push(authAPI.getDashboardStats());
       } else {
         promises.push(attendanceAPI.getOffDayStats({}));
+        promises.push(attendanceAPI.getCompOffBalance({})); // Get comp off balance
       }
 
       const results = await Promise.all(promises);
@@ -34,8 +36,16 @@ const Dashboard = () => {
 
       if (isAdmin && results[2]) {
         setAdminStats(results[2].data);
-      } else if (!isAdmin && results[2]) {
-        setOffDayStats(results[2].data);
+      } else if (!isAdmin) {
+        if (results[2]) {
+          setOffDayStats(results[2].data);
+        }
+        if (results[3]) {
+          setCompOffBalance({
+            available: results[3].data.available || 0,
+            pending: results[3].data.pending_in_leaves || 0
+          });
+        }
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -210,6 +220,35 @@ const Dashboard = () => {
               </span>
             )}
           </h2>
+
+          {/* Comp Off Balance Card - Show first */}
+          {!isAdmin && (
+            <div className="mb-4">
+              <div className="bg-purple-50 rounded-lg p-3 sm:p-4 border border-purple-200">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-purple-800 text-xs sm:text-sm">
+                      Comp Off Balance
+                    </h3>
+                    <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-1 sm:mt-2">
+                      {compOffBalance.available}
+                    </p>
+                    <p className="text-xs text-purple-500">Days available</p>
+                  </div>
+                  <div className="text-right text-xs text-purple-600">
+                    <p>Used first when you apply leave</p>
+                    {compOffBalance.pending > 0 && (
+                      <p className="text-orange-500 mt-1">
+                        {compOffBalance.pending} pending in requests
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Leave Type Balances */}
           {leaveBalance.length > 0 ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {leaveBalance.map((balance) => (

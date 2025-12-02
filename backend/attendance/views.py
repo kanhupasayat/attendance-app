@@ -1108,13 +1108,21 @@ class CompOffBalanceView(APIView):
             expires_on__lt=today
         ).update(status='expired')
 
+        # Calculate pending comp off days in leave requests
+        from leaves.models import LeaveRequest
+        pending_in_leaves = LeaveRequest.objects.filter(
+            user=user,
+            status='pending'
+        ).aggregate(total=Sum('comp_off_days'))['total'] or 0
+
         return Response({
             "user_id": user.id,
             "user_name": user.name,
             "earned": float(earned),
             "used": float(used),
             "expired": float(expired),
-            "available": float(earned - used)
+            "available": float(earned),  # Available = earned (status='earned')
+            "pending_in_leaves": float(pending_in_leaves)  # Comp offs reserved in pending leaves
         })
 
 
