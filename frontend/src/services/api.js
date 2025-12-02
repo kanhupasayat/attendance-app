@@ -116,6 +116,7 @@ export const authAPI = {
     clearCache();
     return api.delete(`/auth/employees/${id}/`);
   },
+  getEmployee: (id) => api.get(`/auth/employees/${id}/`),
   getDashboardStats: () => cachedGet('/auth/dashboard-stats/', {}, 'dashboard-stats'),
   // Notifications
   getNotifications: () => api.get('/auth/notifications/'),

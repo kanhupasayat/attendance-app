@@ -176,7 +176,7 @@ class EmployeeListView(generics.ListCreateAPIView):
 
 class EmployeeDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
-    serializer_class = UserSerializer
+    serializer_class = UserProfileSerializer
     queryset = User.objects.filter(role='employee')
 
 

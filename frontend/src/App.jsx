@@ -28,6 +28,7 @@ const Holidays = lazy(() => import('./pages/Holidays'));
 const Regularization = lazy(() => import('./pages/Regularization'));
 const ProfileRequests = lazy(() => import('./pages/ProfileRequests'));
 const WFH = lazy(() => import('./pages/WFH'));
+const EmployeeProfile = lazy(() => import('./pages/EmployeeProfile'));
 
 function App() {
   return (
@@ -112,6 +113,14 @@ function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <Employees />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employees/:id"
+              element={
+                <ProtectedRoute adminOnly>
+                  <EmployeeProfile />
                 </ProtectedRoute>
               }
             />
