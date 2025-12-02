@@ -33,9 +33,12 @@ const Attendance = () => {
       const params = { month, year };
       const api = isAdmin ? attendanceAPI.getAllAttendance : attendanceAPI.getMyAttendance;
       const response = await api(params);
-      setAttendance(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setAttendance(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching attendance:', error);
+      setAttendance([]);
     } finally {
       setLoading(false);
     }
@@ -45,9 +48,12 @@ const Attendance = () => {
     if (isAdmin) {
       try {
         const response = await authAPI.getEmployees();
-        setEmployees(response.data);
+        // Handle paginated response
+        const data = response.data?.results || response.data;
+        setEmployees(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching employees:', error);
+        setEmployees([]);
       }
     }
   };

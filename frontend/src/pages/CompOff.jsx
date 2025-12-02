@@ -34,9 +34,12 @@ const CompOff = () => {
       } else {
         response = await attendanceAPI.getMyCompOffs();
       }
-      setCompOffs(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setCompOffs(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching comp offs:', error);
+      setCompOffs([]);
     }
   };
 
@@ -56,9 +59,12 @@ const CompOff = () => {
     if (isAdmin) {
       try {
         const response = await authAPI.getEmployees();
-        setEmployees(response.data);
+        // Handle paginated response
+        const data = response.data?.results || response.data;
+        setEmployees(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching employees:', error);
+        setEmployees([]);
       }
     }
   };

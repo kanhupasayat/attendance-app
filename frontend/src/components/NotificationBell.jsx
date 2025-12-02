@@ -25,9 +25,12 @@ const NotificationBell = () => {
     setLoading(true);
     try {
       const response = await authAPI.getNotifications();
-      setNotifications(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching notifications:', error);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }

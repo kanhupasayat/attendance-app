@@ -23,9 +23,12 @@ const Holidays = () => {
     setLoading(true);
     try {
       const response = await leaveAPI.getHolidays();
-      setHolidays(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setHolidays(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching holidays:', error);
+      setHolidays([]);
     } finally {
       setLoading(false);
     }

@@ -21,9 +21,12 @@ const WFH = () => {
       const response = isAdmin
         ? await attendanceAPI.getAllWFH({ status: statusFilter })
         : await attendanceAPI.getMyWFH();
-      setRequests(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching WFH requests:', error);
+      setRequests([]);
     } finally {
       setLoading(false);
     }

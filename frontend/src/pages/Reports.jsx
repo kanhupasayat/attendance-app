@@ -24,13 +24,19 @@ const Reports = () => {
     try {
       if (activeTab === 'attendance') {
         const response = await attendanceAPI.getReport({ month, year });
-        setAttendanceReport(response.data);
+        // Handle paginated response
+        const data = response.data?.results || response.data;
+        setAttendanceReport(Array.isArray(data) ? data : []);
       } else {
         const response = await leaveAPI.getAllBalances({ year });
-        setLeaveReport(response.data);
+        // Handle paginated response
+        const data = response.data?.results || response.data;
+        setLeaveReport(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Error fetching reports:', error);
+      setAttendanceReport([]);
+      setLeaveReport([]);
     } finally {
       setLoading(false);
     }

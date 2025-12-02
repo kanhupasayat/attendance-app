@@ -16,10 +16,13 @@ const ProfileRequests = () => {
     setLoading(true);
     try {
       const response = await authAPI.getAllProfileRequests({ status: statusFilter });
-      setRequests(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching requests:', error);
       toast.error('Failed to load profile requests');
+      setRequests([]);
     } finally {
       setLoading(false);
     }

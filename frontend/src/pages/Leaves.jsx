@@ -39,10 +39,15 @@ const Leaves = () => {
           : leaveAPI.getMyRequests(),
         leaveAPI.getTypes(),
       ]);
-      setRequests(requestsRes.data);
-      setLeaveTypes(typesRes.data);
+      // Handle paginated response
+      const requestsData = requestsRes.data?.results || requestsRes.data;
+      const typesData = typesRes.data?.results || typesRes.data;
+      setRequests(Array.isArray(requestsData) ? requestsData : []);
+      setLeaveTypes(Array.isArray(typesData) ? typesData : []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      setRequests([]);
+      setLeaveTypes([]);
     } finally {
       setLoading(false);
     }

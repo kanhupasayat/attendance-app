@@ -78,9 +78,12 @@ const Regularization = () => {
       const response = isAdmin
         ? await attendanceAPI.getAllRegularizations({ status: statusFilter })
         : await attendanceAPI.getMyRegularizations();
-      setRequests(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching regularizations:', error);
+      setRequests([]);
     } finally {
       setLoading(false);
     }

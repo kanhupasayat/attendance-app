@@ -30,9 +30,12 @@ const Shifts = () => {
   const fetchShifts = async () => {
     try {
       const response = await attendanceAPI.getShifts();
-      setShifts(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setShifts(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching shifts:', error);
+      setShifts([]);
     } finally {
       setLoading(false);
     }
@@ -41,9 +44,12 @@ const Shifts = () => {
   const fetchEmployees = async () => {
     try {
       const response = await authAPI.getEmployees();
-      setEmployees(response.data);
+      // Handle paginated response
+      const data = response.data?.results || response.data;
+      setEmployees(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching employees:', error);
+      setEmployees([]);
     }
   };
 
