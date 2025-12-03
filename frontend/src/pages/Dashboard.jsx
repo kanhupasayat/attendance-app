@@ -10,6 +10,7 @@ const Dashboard = () => {
   const { user, isAdmin } = useAuth();
   const [todayAttendance, setTodayAttendance] = useState(null);
   const [leaveBalance, setLeaveBalance] = useState([]);
+  const [absentDays, setAbsentDays] = useState(0);
   const [compOffBalance, setCompOffBalance] = useState({ available: 0, pending: 0 });
   const [recentLeaves, setRecentLeaves] = useState([]);
   const [offDayStats, setOffDayStats] = useState(null);
@@ -35,7 +36,15 @@ const Dashboard = () => {
       const results = await Promise.all(promises);
 
       setTodayAttendance(results[0].data);
-      setLeaveBalance(results[1].data);
+      // Handle new response format with balances array and absent_days
+      const leaveData = results[1].data;
+      if (leaveData.balances) {
+        setLeaveBalance(leaveData.balances);
+        setAbsentDays(leaveData.absent_days || 0);
+      } else {
+        // Backward compatibility with old format
+        setLeaveBalance(Array.isArray(leaveData) ? leaveData : []);
+      }
 
       if (isAdmin && results[2]) {
         setAdminStats(results[2].data);
@@ -297,6 +306,9 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right text-xs text-red-600">
                     <p>Salary will be deducted</p>
+                    {absentDays > 0 && (
+                      <p className="text-gray-600 mt-1">Absent: {absentDays} day(s)</p>
+                    )}
                   </div>
                 </div>
               </div>

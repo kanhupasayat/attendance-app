@@ -43,17 +43,27 @@ class LeaveTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
 class MyLeaveBalanceView(APIView):
     def get(self, request):
         from django.db.models import Sum
+        from attendance.models import Attendance
+        from decimal import Decimal
 
         year = int(request.query_params.get('year', timezone.now().year))
         month = int(request.query_params.get('month', timezone.now().month))
 
-        # Calculate TOTAL LOP across ALL leave types for this month
-        total_lop_this_month = LeaveRequest.objects.filter(
+        # Calculate TOTAL LOP across ALL leave types for this month (from leave requests)
+        leave_request_lop = LeaveRequest.objects.filter(
             user=request.user,
             status='approved',
             start_date__year=year,
             start_date__month=month
         ).aggregate(total=Sum('lop_days'))['total'] or 0
+
+        # REAL-TIME: Count absent days for this month
+        absent_days = Attendance.objects.filter(
+            user=request.user,
+            date__year=year,
+            date__month=month,
+            status='absent'
+        ).count()
 
         # Get or create balance for current month
         # Only show Sick Leave (SL) - CL and EL are removed from system
@@ -95,15 +105,30 @@ class MyLeaveBalanceView(APIView):
                 start_date__month=month
             ).aggregate(total=Sum('paid_days'))['total'] or 0
 
-            # Update used_leaves if different
-            # Store TOTAL LOP (across all leave types) in this balance for display
+            # REAL-TIME LOP Calculation:
+            # available_sl = total + carried_forward - used_from_leave_requests
+            available_sl = float(balance.total_leaves) + float(balance.carried_forward) - float(approved_paid_days)
+
+            # Calculate how much leave will be used for absents
+            leave_for_absents = min(absent_days, max(0, available_sl))
+
+            # LOP = absents that can't be covered by leave + LOP from leave requests
+            absent_lop = max(0, absent_days - available_sl)
+            total_lop = float(leave_request_lop) + absent_lop
+
+            # Update balance with real-time calculations
             needs_save = False
-            if float(balance.used_leaves) != float(approved_paid_days):
-                balance.used_leaves = approved_paid_days
+
+            # used_leaves = leave requests + absents covered by leave
+            total_used = float(approved_paid_days) + leave_for_absents
+            if float(balance.used_leaves) != total_used:
+                balance.used_leaves = Decimal(str(total_used))
                 needs_save = True
-            if float(balance.lop_days) != float(total_lop_this_month):
-                balance.lop_days = total_lop_this_month
+
+            if float(balance.lop_days) != total_lop:
+                balance.lop_days = Decimal(str(total_lop))
                 needs_save = True
+
             if needs_save:
                 balance.save()
 
@@ -134,7 +159,15 @@ class MyLeaveBalanceView(APIView):
 
             balances.append(balance)
 
-        return Response(LeaveBalanceSerializer(balances, many=True).data)
+        # Return balance data with additional absent info
+        balance_data = LeaveBalanceSerializer(balances, many=True).data
+
+        return Response({
+            'balances': balance_data,
+            'absent_days': absent_days,
+            'month': month,
+            'year': year
+        })
 
 
 class LeaveApplyView(APIView):
