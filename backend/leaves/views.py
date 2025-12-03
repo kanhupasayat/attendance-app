@@ -844,15 +844,18 @@ class CheckTodayLeaveView(APIView):
 class ProcessMonthEndView(APIView):
     """
     API endpoint to process month-end:
-    - Convert unused sick leave to comp off
+    1. Auto-deduct absent days from available sick leave
+    2. Mark remaining absents as LOP (Loss of Pay)
+    3. Convert unused sick leave to comp off
     Can be called by cron services (similar to auto punch-out)
     """
     permission_classes = []  # Allow unauthenticated for cron
 
     def post(self, request):
         from django.conf import settings
-        from attendance.models import CompOff
+        from attendance.models import CompOff, Attendance
         from datetime import date, timedelta
+        from decimal import Decimal
 
         # Security check - require a secret key
         cron_secret = request.data.get('secret') or request.query_params.get('secret')
@@ -886,66 +889,137 @@ class ProcessMonthEndView(APIView):
         employees = User.objects.filter(role='employee', is_active=True)
 
         results = []
+        total_absents = 0
+        total_leave_deducted = 0
+        total_lop = 0
         comp_off_created = 0
 
         for employee in employees:
-            # Get sick leave balance for the processed month
-            sl_balance = LeaveBalance.objects.filter(
+            emp_result = {'employee': employee.name}
+
+            # Step 1: Count absent days for this month
+            absent_days = Attendance.objects.filter(
+                user=employee,
+                date__year=process_year,
+                date__month=process_month,
+                status='absent'
+            ).count()
+
+            emp_result['absent_days'] = absent_days
+
+            # Step 2: Get or create sick leave balance
+            sl_balance, created = LeaveBalance.objects.get_or_create(
                 user=employee,
                 leave_type=sick_leave,
                 year=process_year,
-                month=process_month
-            ).first()
+                month=process_month,
+                defaults={
+                    'total_leaves': Decimal('1'),
+                    'used_leaves': Decimal('0'),
+                    'lop_days': Decimal('0')
+                }
+            )
 
-            monthly_sick_leave = 1  # 1 sick leave per month
-            used_this_month = float(sl_balance.used_leaves) if sl_balance else 0
+            available_sl = float(sl_balance.total_leaves) - float(sl_balance.used_leaves)
+            emp_result['available_sick_leave'] = available_sl
 
-            if used_this_month < monthly_sick_leave:
-                unused_days = monthly_sick_leave - used_this_month
+            # Step 3: Process absent days
+            if absent_days > 0:
+                total_absents += absent_days
 
-                # Last day of processed month
-                if process_month == 12:
-                    last_day = date(process_year, 12, 31)
-                else:
-                    last_day = date(process_year, process_month + 1, 1) - timedelta(days=1)
+                # Deduct from sick leave first
+                leave_to_deduct = min(absent_days, available_sl)
+                lop_days = absent_days - leave_to_deduct
 
-                # Check if already exists
-                existing = CompOff.objects.filter(
-                    user=employee,
-                    earned_date=last_day,
-                    reason__contains='Unused Sick Leave'
-                ).first()
+                if leave_to_deduct > 0:
+                    sl_balance.used_leaves = Decimal(str(float(sl_balance.used_leaves) + leave_to_deduct))
+                    sl_balance.save()
+                    total_leave_deducted += leave_to_deduct
+                    emp_result['leave_deducted'] = leave_to_deduct
 
-                if not existing:
-                    CompOff.objects.create(
+                if lop_days > 0:
+                    sl_balance.lop_days = Decimal(str(float(sl_balance.lop_days) + lop_days))
+                    sl_balance.save()
+                    total_lop += lop_days
+                    emp_result['lop_days'] = lop_days
+
+                    # Update attendance notes for LOP days
+                    absent_records = Attendance.objects.filter(
+                        user=employee,
+                        date__year=process_year,
+                        date__month=process_month,
+                        status='absent'
+                    ).order_by('date')
+
+                    for i, record in enumerate(absent_records):
+                        if i >= leave_to_deduct:
+                            if 'LOP' not in record.notes:
+                                record.notes = f"LOP - No leave balance. {record.notes}".strip()
+                                record.save()
+
+                # Check remaining sick leave for comp off
+                remaining_sl = available_sl - leave_to_deduct
+                if remaining_sl > 0:
+                    if process_month == 12:
+                        last_day = date(process_year, 12, 31)
+                    else:
+                        last_day = date(process_year, process_month + 1, 1) - timedelta(days=1)
+
+                    existing = CompOff.objects.filter(
                         user=employee,
                         earned_date=last_day,
-                        earned_hours=unused_days * 8,
-                        credit_days=unused_days,
-                        reason=f'Unused Sick Leave for {process_month}/{process_year}',
-                        status='earned'
-                    )
-                    comp_off_created += 1
-                    results.append({
-                        'employee': employee.name,
-                        'unused_sick_leave': unused_days,
-                        'comp_off_created': True
-                    })
-                else:
-                    results.append({
-                        'employee': employee.name,
-                        'message': 'Comp off already exists'
-                    })
+                        reason__contains='Unused Sick Leave'
+                    ).first()
+
+                    if not existing:
+                        CompOff.objects.create(
+                            user=employee,
+                            earned_date=last_day,
+                            earned_hours=remaining_sl * 8,
+                            credit_days=remaining_sl,
+                            reason=f'Unused Sick Leave for {process_month}/{process_year}',
+                            status='earned'
+                        )
+                        comp_off_created += 1
+                        emp_result['comp_off_created'] = remaining_sl
             else:
-                results.append({
-                    'employee': employee.name,
-                    'sick_leave_used': used_this_month,
-                    'comp_off_created': False
-                })
+                # No absents - convert full sick leave to comp off
+                if available_sl > 0:
+                    if process_month == 12:
+                        last_day = date(process_year, 12, 31)
+                    else:
+                        last_day = date(process_year, process_month + 1, 1) - timedelta(days=1)
+
+                    existing = CompOff.objects.filter(
+                        user=employee,
+                        earned_date=last_day,
+                        reason__contains='Unused Sick Leave'
+                    ).first()
+
+                    if not existing:
+                        CompOff.objects.create(
+                            user=employee,
+                            earned_date=last_day,
+                            earned_hours=available_sl * 8,
+                            credit_days=available_sl,
+                            reason=f'Unused Sick Leave for {process_month}/{process_year}',
+                            status='earned'
+                        )
+                        comp_off_created += 1
+                        emp_result['comp_off_created'] = available_sl
+                    else:
+                        emp_result['message'] = 'Comp off already exists'
+
+            results.append(emp_result)
 
         return Response({
             "message": f"Processed month-end for {process_month}/{process_year}",
-            "comp_offs_created": comp_off_created,
+            "summary": {
+                "total_absent_days": total_absents,
+                "leave_deducted": total_leave_deducted,
+                "lop_marked": total_lop,
+                "comp_offs_created": comp_off_created
+            },
             "results": results
         })
 

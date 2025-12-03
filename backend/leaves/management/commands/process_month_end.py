@@ -1,8 +1,9 @@
 """
 Management command to process month-end leave calculations.
 Run this at the end of each month (or first day of new month) to:
-1. Convert unused sick leave (1 per month) to comp off
-2. Carry forward unused leaves to next month
+1. Auto-deduct absent days from available sick leave
+2. Mark remaining absents as LOP (Loss of Pay)
+3. Convert unused sick leave to comp off
 
 Usage:
     python manage.py process_month_end
@@ -13,12 +14,13 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from accounts.models import User
 from leaves.models import LeaveType, LeaveBalance
-from attendance.models import CompOff
+from attendance.models import CompOff, Attendance
 from datetime import date, timedelta
+from decimal import Decimal
 
 
 class Command(BaseCommand):
-    help = 'Process month-end: convert unused sick leave to comp off'
+    help = 'Process month-end: deduct absents from leave, mark LOP, convert unused sick leave to comp off'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -68,45 +70,90 @@ class Command(BaseCommand):
 
         employees = User.objects.filter(role='employee', is_active=True)
 
+        total_absents = 0
+        total_leave_deducted = 0
+        total_lop = 0
         comp_off_created = 0
-        carry_forward_count = 0
 
         for employee in employees:
-            self.stdout.write(f'\nProcessing: {employee.name}')
+            self.stdout.write(f'\n{"="*50}')
+            self.stdout.write(f'Processing: {employee.name}')
 
-            # Get sick leave balance for the processed month
-            sl_balance = LeaveBalance.objects.filter(
+            # Step 1: Count absent days for this month
+            absent_days = Attendance.objects.filter(
+                user=employee,
+                date__year=process_year,
+                date__month=process_month,
+                status='absent'
+            ).count()
+
+            self.stdout.write(f'  Absent days: {absent_days}')
+
+            # Step 2: Get or create sick leave balance for the month
+            sl_balance, created = LeaveBalance.objects.get_or_create(
                 user=employee,
                 leave_type=sick_leave,
                 year=process_year,
-                month=process_month
-            ).first()
+                month=process_month,
+                defaults={
+                    'total_leaves': Decimal('1'),
+                    'used_leaves': Decimal('0'),
+                    'lop_days': Decimal('0')
+                }
+            )
 
-            if sl_balance:
-                # Each month gets 1 sick leave credit
-                # If unused (used_leaves = 0), convert to comp off
-                monthly_sick_leave = 1  # 1 sick leave per month
+            available_sl = float(sl_balance.total_leaves) - float(sl_balance.used_leaves)
+            self.stdout.write(f'  Available Sick Leave: {available_sl}')
 
-                # Check how much was used this month
-                used_this_month = float(sl_balance.used_leaves)
+            # Step 3: Process absent days - deduct from leave, mark LOP
+            if absent_days > 0:
+                total_absents += absent_days
 
-                if used_this_month < monthly_sick_leave:
-                    # Unused sick leave - convert to comp off
-                    unused_days = monthly_sick_leave - used_this_month
+                # Deduct from sick leave first
+                leave_to_deduct = min(absent_days, available_sl)
+                lop_days = absent_days - leave_to_deduct
 
-                    self.stdout.write(
-                        f'  Sick Leave: {used_this_month} used, {unused_days} unused -> Converting to Comp Off'
-                    )
+                if leave_to_deduct > 0:
+                    self.stdout.write(f'  -> Deducting {leave_to_deduct} day(s) from Sick Leave')
+                    total_leave_deducted += leave_to_deduct
 
                     if not dry_run:
-                        # Create comp off for unused sick leave
-                        # Set earned_date as last day of the processed month
+                        sl_balance.used_leaves = Decimal(str(float(sl_balance.used_leaves) + leave_to_deduct))
+                        sl_balance.save()
+
+                if lop_days > 0:
+                    self.stdout.write(self.style.WARNING(f'  -> Marking {lop_days} day(s) as LOP'))
+                    total_lop += lop_days
+
+                    if not dry_run:
+                        sl_balance.lop_days = Decimal(str(float(sl_balance.lop_days) + lop_days))
+                        sl_balance.save()
+
+                        # Update attendance notes for LOP days
+                        absent_records = Attendance.objects.filter(
+                            user=employee,
+                            date__year=process_year,
+                            date__month=process_month,
+                            status='absent'
+                        ).order_by('date')
+
+                        for i, record in enumerate(absent_records):
+                            if i >= leave_to_deduct:
+                                if 'LOP' not in record.notes:
+                                    record.notes = f"LOP - No leave balance. {record.notes}".strip()
+                                    record.save()
+
+                # After deducting absents, check remaining sick leave for comp off
+                remaining_sl = available_sl - leave_to_deduct
+                if remaining_sl > 0:
+                    self.stdout.write(f'  Remaining Sick Leave: {remaining_sl} -> Converting to Comp Off')
+
+                    if not dry_run:
                         if process_month == 12:
                             last_day = date(process_year, 12, 31)
                         else:
                             last_day = date(process_year, process_month + 1, 1) - timedelta(days=1)
 
-                        # Check if comp off already exists for this reason
                         existing = CompOff.objects.filter(
                             user=employee,
                             earned_date=last_day,
@@ -117,52 +164,53 @@ class Command(BaseCommand):
                             CompOff.objects.create(
                                 user=employee,
                                 earned_date=last_day,
-                                earned_hours=unused_days * 8,  # 8 hours per day
-                                credit_days=unused_days,
+                                earned_hours=remaining_sl * 8,
+                                credit_days=remaining_sl,
                                 reason=f'Unused Sick Leave for {process_month}/{process_year}',
                                 status='earned'
                             )
                             comp_off_created += 1
-                            self.stdout.write(self.style.SUCCESS(
-                                f'    Created Comp Off: {unused_days} days'
-                            ))
-                        else:
-                            self.stdout.write(f'    Comp Off already exists for this month')
-                else:
-                    self.stdout.write(f'  Sick Leave fully used ({used_this_month} days)')
+                            self.stdout.write(self.style.SUCCESS(f'    Created Comp Off: {remaining_sl} day(s)'))
             else:
-                # No balance record - employee didn't have sick leave balance
-                # Create comp off for 1 day (monthly sick leave not used)
-                self.stdout.write(f'  No sick leave balance found - granting 1 day comp off')
+                # No absents - convert full sick leave to comp off
+                if available_sl > 0:
+                    self.stdout.write(f'  No absents. Sick Leave: {available_sl} -> Converting to Comp Off')
 
-                if not dry_run:
-                    if process_month == 12:
-                        last_day = date(process_year, 12, 31)
-                    else:
-                        last_day = date(process_year, process_month + 1, 1) - timedelta(days=1)
+                    if not dry_run:
+                        if process_month == 12:
+                            last_day = date(process_year, 12, 31)
+                        else:
+                            last_day = date(process_year, process_month + 1, 1) - timedelta(days=1)
 
-                    existing = CompOff.objects.filter(
-                        user=employee,
-                        earned_date=last_day,
-                        reason__contains='Unused Sick Leave'
-                    ).first()
-
-                    if not existing:
-                        CompOff.objects.create(
+                        existing = CompOff.objects.filter(
                             user=employee,
                             earned_date=last_day,
-                            earned_hours=8,
-                            credit_days=1.0,
-                            reason=f'Unused Sick Leave for {process_month}/{process_year}',
-                            status='earned'
-                        )
-                        comp_off_created += 1
+                            reason__contains='Unused Sick Leave'
+                        ).first()
 
-        self.stdout.write(self.style.SUCCESS(
-            f'\nCompleted! Created {comp_off_created} comp offs from unused sick leaves.'
-        ))
+                        if not existing:
+                            CompOff.objects.create(
+                                user=employee,
+                                earned_date=last_day,
+                                earned_hours=available_sl * 8,
+                                credit_days=available_sl,
+                                reason=f'Unused Sick Leave for {process_month}/{process_year}',
+                                status='earned'
+                            )
+                            comp_off_created += 1
+                            self.stdout.write(self.style.SUCCESS(f'    Created Comp Off: {available_sl} day(s)'))
+                        else:
+                            self.stdout.write(f'    Comp Off already exists')
+
+        # Summary
+        self.stdout.write(f'\n{"="*50}')
+        self.stdout.write(self.style.SUCCESS('SUMMARY'))
+        self.stdout.write(f'  Total absent days: {total_absents}')
+        self.stdout.write(f'  Leave deducted: {total_leave_deducted} day(s)')
+        self.stdout.write(self.style.WARNING(f'  LOP marked: {total_lop} day(s)'))
+        self.stdout.write(f'  Comp offs created: {comp_off_created}')
 
         if dry_run:
             self.stdout.write(self.style.WARNING(
-                'This was a dry run. Run without --dry-run to apply changes.'
+                '\nThis was a dry run. Run without --dry-run to apply changes.'
             ))
