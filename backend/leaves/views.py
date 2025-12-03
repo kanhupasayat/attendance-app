@@ -59,17 +59,24 @@ class MyLeaveBalanceView(APIView):
             start_date__month=month
         ).aggregate(total=Sum('lop_days'))['total'] or 0
 
-        # REAL-TIME: Count absent days (working days with no attendance record)
+        # REAL-TIME: Count absent days (working days with no attendance OR status='absent')
         # Get user's weekly off day (0=Monday, 6=Sunday, default Sunday)
         user_weekly_off = request.user.weekly_off if request.user.weekly_off is not None else 6
 
-        # Get all attendance records for this month
-        attendance_dates = set(
-            Attendance.objects.filter(
+        # Get all attendance records for this month with their status
+        attendance_records = {
+            record['date']: record['status']
+            for record in Attendance.objects.filter(
                 user=request.user,
                 date__year=year,
                 date__month=month
-            ).values_list('date', flat=True)
+            ).values('date', 'status')
+        }
+
+        # For backward compatibility - dates where user was actually present
+        attendance_dates = set(
+            d for d, s in attendance_records.items()
+            if s in ['present', 'half_day', 'on_leave']
         )
 
         # Get approved leave dates for this month
@@ -118,8 +125,14 @@ class MyLeaveBalanceView(APIView):
             if current_date in leave_dates:
                 continue
 
-            # If no attendance record exists, count as absent
-            if current_date not in attendance_dates:
+            # Count as absent if:
+            # 1. No attendance record exists, OR
+            # 2. Attendance record exists with status='absent'
+            if current_date not in attendance_records:
+                # No record at all = absent
+                absent_days += 1
+            elif attendance_records.get(current_date) == 'absent':
+                # Explicitly marked absent by admin
                 absent_days += 1
 
         # Get or create balance for current month
