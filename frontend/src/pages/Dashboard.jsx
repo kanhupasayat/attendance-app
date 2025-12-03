@@ -89,8 +89,12 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex flex-col justify-center items-center h-64 gap-4">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
+            <div className="w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+          </div>
+          <p className="text-gray-500 font-medium">Loading dashboard...</p>
         </div>
       </Layout>
     );
@@ -98,27 +102,35 @@ const Dashboard = () => {
 
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-6">
+      <div className="space-y-5 sm:space-y-6">
         {/* Welcome Section */}
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-                Welcome, {user?.name}!
-              </h1>
-              <p className="text-sm sm:text-base text-gray-600">
-                {new Date().toLocaleDateString('en-IN', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </p>
+        <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
+                  Welcome back, {user?.name?.split(' ')[0]}!
+                </h1>
+                <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-0.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {new Date().toLocaleDateString('en-IN', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+              </div>
             </div>
             {!isAdmin && user?.weekly_off_display && (
-              <div className="bg-purple-100 px-3 py-2 rounded-lg self-start">
-                <p className="text-xs sm:text-sm text-purple-600">Weekly Off</p>
-                <p className="text-base sm:text-lg font-bold text-purple-800">{user.weekly_off_display}</p>
+              <div className="bg-gradient-to-br from-purple-500 to-indigo-600 px-4 py-3 rounded-xl self-start shadow-lg">
+                <p className="text-xs text-purple-100 font-medium">Weekly Off</p>
+                <p className="text-lg font-bold text-white">{user.weekly_off_display}</p>
               </div>
             )}
           </div>
@@ -126,24 +138,24 @@ const Dashboard = () => {
 
         {/* Face Registration Warning */}
         {!isAdmin && !user?.face_descriptor && (
-          <div className="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-4 sm:p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-orange-800">Face Verification Not Set Up</h3>
+                <h3 className="text-base font-semibold text-orange-800">Face Verification Not Set Up</h3>
                 <p className="text-sm text-orange-700 mt-1">
                   Please upload a clear profile photo with your face visible to enable face verification during punch in.
                 </p>
                 <Link
                   to="/profile"
-                  className="inline-flex items-center mt-2 text-sm font-medium text-orange-600 hover:text-orange-800"
+                  className="inline-flex items-center mt-3 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition-all shadow-sm"
                 >
                   Go to Profile
-                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </Link>
@@ -154,42 +166,83 @@ const Dashboard = () => {
 
         {/* Punch Section */}
         {!isAdmin && (
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Today's Attendance</h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Today's Attendance</h2>
+            </div>
             {todayAttendance?.is_off_day && (
-              <div className="mb-4 bg-purple-100 border border-purple-300 text-purple-800 px-3 py-2 rounded-lg text-sm sm:text-base">
-                Today is your weekly off day! You're working extra today.
+              <div className="mb-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 text-purple-800 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
+                <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                <span>Today is your weekly off day! You're working extra today.</span>
               </div>
             )}
-            <div className="flex flex-col gap-4">
-              <div>
+            <div className="flex flex-col gap-5">
+              <div className="bg-gray-50 rounded-xl p-4">
                 {hasPunchedIn ? (
-                  <div className="space-y-2">
-                    <p className="text-green-600 text-sm sm:text-base">
-                      <span className="font-semibold">Punch In:</span>{' '}
-                      {formatTime(todayAttendance.punch_in)}
-                    </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Punch In</p>
+                        <p className="text-lg font-bold text-green-600">{formatTime(todayAttendance.punch_in)}</p>
+                      </div>
+                    </div>
                     {hasPunchedOut ? (
-                      <p className="text-red-600 text-sm sm:text-base">
-                        <span className="font-semibold">Punch Out:</span>{' '}
-                        {formatTime(todayAttendance.punch_out)}
-                      </p>
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Punch Out</p>
+                            <p className="text-lg font-bold text-red-600">{formatTime(todayAttendance.punch_out)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Working Hours</p>
+                            <p className="text-lg font-bold text-blue-600">{todayAttendance.working_hours} hrs</p>
+                          </div>
+                        </div>
+                      </>
                     ) : (
-                      <p className="text-yellow-600 text-sm sm:text-base">
-                        You haven't punched out yet
-                      </p>
-                    )}
-                    {hasPunchedOut && (
-                      <p className="text-blue-600 text-sm sm:text-base">
-                        <span className="font-semibold">Working Hours:</span>{' '}
-                        {todayAttendance.working_hours} hrs
-                      </p>
+                      <div className="flex items-center gap-3 sm:col-span-2">
+                        <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <p className="text-sm text-yellow-700 font-medium">You haven't punched out yet</p>
+                      </div>
                     )}
                   </div>
                 ) : (
-                  <p className="text-gray-600 text-sm sm:text-base">
-                    You haven't punched in today
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500">You haven't punched in today</p>
+                  </div>
                 )}
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -213,38 +266,55 @@ const Dashboard = () => {
 
         {/* Off-Day Work Stats for Employees */}
         {!isAdmin && offDayStats && offDayStats.total_off_day_work > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Off-Day Work (This Month)</h2>
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="bg-purple-50 rounded-lg p-3 sm:p-4 border border-purple-200">
-                <h3 className="font-semibold text-purple-800 text-xs sm:text-sm">Days Worked on Off</h3>
-                <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-1 sm:mt-2">
-                  {offDayStats.total_off_day_work}
-                </p>
-                <p className="text-xs text-purple-500">Extra days this month</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
               </div>
-              <div className="bg-orange-50 rounded-lg p-3 sm:p-4 border border-orange-200">
-                <h3 className="font-semibold text-orange-800 text-xs sm:text-sm">Hours on Off Days</h3>
-                <p className="text-2xl sm:text-3xl font-bold text-orange-600 mt-1 sm:mt-2">
-                  {parseFloat(offDayStats.total_hours_on_off_days).toFixed(1)}
-                </p>
-                <p className="text-xs text-orange-500">Extra hours this month</p>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Off-Day Work (This Month)</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-semibold text-purple-800 text-sm">Days Worked</h3>
+                </div>
+                <p className="text-3xl font-bold text-purple-600">{offDayStats.total_off_day_work}</p>
+                <p className="text-xs text-purple-500 mt-1">Extra days this month</p>
+              </div>
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-semibold text-orange-800 text-sm">Hours Worked</h3>
+                </div>
+                <p className="text-3xl font-bold text-orange-600">{parseFloat(offDayStats.total_hours_on_off_days).toFixed(1)}</p>
+                <p className="text-xs text-orange-500 mt-1">Extra hours this month</p>
               </div>
             </div>
             {offDayStats.off_day_records && offDayStats.off_day_records.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Off-Day Work Details:</h4>
-                <div className="space-y-1">
+              <div className="mt-5">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Work Details</h4>
+                <div className="space-y-2">
                   {offDayStats.off_day_records.map((record, index) => (
-                    <div key={index} className="flex justify-between text-xs sm:text-sm bg-gray-50 px-2 sm:px-3 py-2 rounded">
-                      <span className="text-gray-700">
+                    <div key={index} className="flex justify-between items-center text-sm bg-gray-50 px-4 py-3 rounded-xl">
+                      <span className="text-gray-700 font-medium">
                         {new Date(record.date).toLocaleDateString('en-IN', {
                           weekday: 'short',
                           day: 'numeric',
                           month: 'short'
                         })}
                       </span>
-                      <span className="text-purple-600 font-medium">
+                      <span className="text-purple-600 font-bold bg-purple-100 px-3 py-1 rounded-lg">
                         {parseFloat(record.working_hours).toFixed(1)} hrs
                       </span>
                     </div>
@@ -256,36 +326,46 @@ const Dashboard = () => {
         )}
 
         {/* Leave Balance Section */}
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
-            Leave Balance
-            {leaveBalance.length > 0 && leaveBalance[0].month_name && (
-              <span className="text-xs sm:text-sm font-normal text-gray-500 ml-2">
-                ({leaveBalance[0].month_name} {leaveBalance[0].year})
-              </span>
-            )}
-          </h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+          <div className="flex items-center gap-2 mb-5">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Leave Balance</h2>
+              {leaveBalance.length > 0 && leaveBalance[0].month_name && (
+                <p className="text-xs text-gray-500">
+                  {leaveBalance[0].month_name} {leaveBalance[0].year}
+                </p>
+              )}
+            </div>
+          </div>
 
           {/* Comp Off and LOP Summary Cards */}
           {!isAdmin && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
               {/* Comp Off Balance Card */}
-              <div className="bg-purple-50 rounded-lg p-3 sm:p-4 border border-purple-200">
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="font-semibold text-purple-800 text-xs sm:text-sm">
-                      Comp Off Balance
-                    </h3>
-                    <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-1 sm:mt-2">
-                      {compOffBalance.available}
-                    </p>
-                    <p className="text-xs text-purple-500">Days available</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-purple-800 text-sm">Comp Off Balance</h3>
+                    </div>
+                    <p className="text-3xl font-bold text-purple-600">{compOffBalance.available}</p>
+                    <p className="text-xs text-purple-500 mt-1">Days available</p>
                   </div>
-                  <div className="text-right text-xs text-purple-600">
+                  <div className="text-right text-xs text-purple-600 max-w-[120px]">
                     <p>Used first when you apply leave</p>
                     {compOffBalance.pending > 0 && (
-                      <p className="text-orange-500 mt-1">
-                        {compOffBalance.pending} pending in requests
+                      <p className="text-orange-500 mt-1 font-medium">
+                        {compOffBalance.pending} pending
                       </p>
                     )}
                   </div>
@@ -293,21 +373,26 @@ const Dashboard = () => {
               </div>
 
               {/* LOP Summary Card */}
-              <div className="bg-red-50 rounded-lg p-3 sm:p-4 border border-red-200">
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border border-red-100">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="font-semibold text-red-800 text-xs sm:text-sm">
-                      Loss of Pay (LOP)
-                    </h3>
-                    <p className="text-2xl sm:text-3xl font-bold text-red-600 mt-1 sm:mt-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h3 className="font-semibold text-red-800 text-sm">Loss of Pay (LOP)</h3>
+                    </div>
+                    <p className="text-3xl font-bold text-red-600">
                       {leaveBalance.reduce((total, b) => total + parseFloat(b.lop_days || 0), 0)}
                     </p>
-                    <p className="text-xs text-red-500">Days this month</p>
+                    <p className="text-xs text-red-500 mt-1">Days this month</p>
                   </div>
-                  <div className="text-right text-xs text-red-600">
+                  <div className="text-right text-xs text-red-600 max-w-[120px]">
                     <p>Salary will be deducted</p>
                     {absentDays > 0 && (
-                      <p className="text-gray-600 mt-1">Absent: {absentDays} day(s)</p>
+                      <p className="text-gray-600 mt-1 font-medium">Absent: {absentDays} day(s)</p>
                     )}
                   </div>
                 </div>
@@ -321,71 +406,100 @@ const Dashboard = () => {
               {leaveBalance.map((balance) => (
                 <div
                   key={balance.id}
-                  className="bg-gray-50 rounded-lg p-3 sm:p-4 border"
+                  className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl p-4 border border-gray-100 hover:shadow-md transition-all"
                 >
-                  <h3 className="font-semibold text-gray-800 text-xs sm:text-sm truncate">
+                  <h3 className="font-semibold text-gray-800 text-sm truncate">
                     {balance.leave_type_details?.name || 'Monthly Leave'}
                   </h3>
-                  <p className="text-2xl sm:text-3xl font-bold text-blue-600 mt-1 sm:mt-2">
+                  <p className="text-3xl font-bold text-blue-600 mt-2">
                     {balance.available_leaves}
                   </p>
                   <p className="text-xs text-gray-500">Available this month</p>
-                  <div className="mt-2 text-xs text-gray-500 space-y-0.5">
-                    <p>Quota: {balance.total_leaves}</p>
+                  <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Quota:</span>
+                      <span className="font-medium text-gray-700">{balance.total_leaves}</span>
+                    </div>
                     {parseFloat(balance.carried_forward) > 0 && (
-                      <p className="text-green-600">+CF: {balance.carried_forward}</p>
+                      <div className="flex justify-between text-green-600">
+                        <span>Carried:</span>
+                        <span className="font-medium">+{balance.carried_forward}</span>
+                      </div>
                     )}
-                    <p>Used: {balance.used_leaves}</p>
+                    <div className="flex justify-between">
+                      <span>Used:</span>
+                      <span className="font-medium text-gray-700">{balance.used_leaves}</span>
+                    </div>
                     {parseFloat(balance.lop_days) > 0 && (
-                      <p className="text-red-500">LOP: {balance.lop_days}</p>
+                      <div className="flex justify-between text-red-500">
+                        <span>LOP:</span>
+                        <span className="font-medium">{balance.lop_days}</span>
+                      </div>
                     )}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-gray-600 text-sm">No leave balance data available.</p>
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <p className="text-gray-500 text-sm">No leave balance data available.</p>
+            </div>
           )}
         </div>
 
         {/* Recent Leave Requests - Employee Only */}
         {!isAdmin && recentLeaves.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex justify-between items-center mb-3 sm:mb-4">
-              <h2 className="text-lg sm:text-xl font-semibold">Recent Leave Requests</h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+            <div className="flex justify-between items-center mb-5">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">Recent Leave Requests</h2>
+              </div>
               <Link
                 to="/leaves"
-                className="text-blue-600 hover:text-blue-800 text-sm"
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-all"
               >
-                View All →
+                View All
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
             </div>
             <div className="space-y-3">
               {recentLeaves.map((leave) => (
                 <div
                   key={leave.id}
-                  className={`p-3 rounded-lg border ${
-                    leave.status === 'approved' ? 'bg-green-50 border-green-200' :
-                    leave.status === 'pending' ? 'bg-yellow-50 border-yellow-200' :
-                    leave.status === 'rejected' ? 'bg-red-50 border-red-200' :
+                  className={`p-4 rounded-xl border transition-all hover:shadow-sm ${
+                    leave.status === 'approved' ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' :
+                    leave.status === 'pending' ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-200' :
+                    leave.status === 'rejected' ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200' :
                     'bg-gray-50 border-gray-200'
                   }`}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        leave.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        leave.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        leave.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                        leave.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        leave.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        leave.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
                       }`}>
                         {leave.status.toUpperCase()}
                       </span>
-                      <span className="ml-2 text-sm font-medium text-gray-700">
+                      <span className="text-sm font-semibold text-gray-700">
                         {leave.leave_type_details?.name}
                       </span>
                     </div>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 bg-white/80 px-2 py-1 rounded-lg">
                       {new Date(leave.start_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                       {leave.start_date !== leave.end_date && (
                         <> - {new Date(leave.end_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</>
@@ -395,29 +509,29 @@ const Dashboard = () => {
 
                   {/* Leave Breakdown */}
                   <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div className="text-center bg-white rounded p-1.5">
-                      <p className="text-gray-500">Total</p>
-                      <p className="font-bold text-gray-800">{leave.total_days}</p>
+                    <div className="text-center bg-white/80 backdrop-blur rounded-lg p-2">
+                      <p className="text-gray-500 text-[10px] uppercase tracking-wide">Total</p>
+                      <p className="font-bold text-gray-800 text-base">{leave.total_days}</p>
                     </div>
-                    <div className="text-center bg-white rounded p-1.5">
-                      <p className="text-gray-500">CompOff</p>
-                      <p className="font-bold text-purple-600">{leave.comp_off_days || 0}</p>
+                    <div className="text-center bg-white/80 backdrop-blur rounded-lg p-2">
+                      <p className="text-gray-500 text-[10px] uppercase tracking-wide">Comp Off</p>
+                      <p className="font-bold text-purple-600 text-base">{leave.comp_off_days || 0}</p>
                     </div>
-                    <div className="text-center bg-white rounded p-1.5">
-                      <p className="text-gray-500">Paid</p>
-                      <p className="font-bold text-green-600">{leave.paid_days || 0}</p>
+                    <div className="text-center bg-white/80 backdrop-blur rounded-lg p-2">
+                      <p className="text-gray-500 text-[10px] uppercase tracking-wide">Paid</p>
+                      <p className="font-bold text-green-600 text-base">{leave.paid_days || 0}</p>
                     </div>
-                    <div className="text-center bg-white rounded p-1.5">
-                      <p className="text-gray-500">LOP</p>
-                      <p className="font-bold text-red-600">{leave.lop_days || 0}</p>
+                    <div className="text-center bg-white/80 backdrop-blur rounded-lg p-2">
+                      <p className="text-gray-500 text-[10px] uppercase tracking-wide">LOP</p>
+                      <p className="font-bold text-red-600 text-base">{leave.lop_days || 0}</p>
                     </div>
                   </div>
 
                   {/* Show remarks if rejected or auto-adjusted */}
                   {leave.review_remarks && (
-                    <p className={`mt-2 text-xs ${leave.status === 'rejected' ? 'text-red-600' : 'text-blue-600'}`}>
-                      <span className="font-medium">{leave.status === 'rejected' ? 'Reason:' : 'Note:'}</span> {leave.review_remarks}
-                    </p>
+                    <div className={`mt-3 p-2 rounded-lg text-xs ${leave.status === 'rejected' ? 'bg-red-100/50 text-red-700' : 'bg-blue-100/50 text-blue-700'}`}>
+                      <span className="font-semibold">{leave.status === 'rejected' ? 'Reason:' : 'Note:'}</span> {leave.review_remarks}
+                    </div>
                   )}
                 </div>
               ))}

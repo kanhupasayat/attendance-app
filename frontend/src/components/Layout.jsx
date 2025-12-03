@@ -17,30 +17,35 @@ const Layout = ({ children }) => {
   const isActive = (path) => location.pathname === path;
 
   const navLinkClass = (path) =>
-    `px-2 xl:px-3 py-2 rounded-md text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
+    `px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
       isActive(path)
-        ? 'bg-blue-700 text-white'
-        : 'text-blue-100 hover:bg-blue-500 hover:text-white'
+        ? 'bg-white/20 text-white shadow-sm backdrop-blur-sm'
+        : 'text-blue-100 hover:bg-white/10 hover:text-white'
     }`;
 
   const mobileNavLinkClass = (path) =>
-    `block px-3 py-3 rounded-md text-base font-medium transition-colors ${
+    `block px-4 py-3 rounded-xl text-base font-medium transition-all ${
       isActive(path)
-        ? 'bg-blue-700 text-white'
-        : 'text-blue-100 hover:bg-blue-500 hover:text-white'
+        ? 'bg-white/20 text-white shadow-sm'
+        : 'text-blue-100 hover:bg-white/10 hover:text-white'
     }`;
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <nav className="bg-blue-600 shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4">
-          <div className="flex justify-between h-14 sm:h-16">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <nav className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 shadow-lg sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+          <div className="flex justify-between h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <Link to="/" className="text-white font-bold text-base sm:text-lg xl:text-xl whitespace-nowrap">
-                Attendance
+              <Link to="/" className="flex items-center gap-2 text-white font-bold text-lg xl:text-xl whitespace-nowrap group">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center group-hover:bg-white/30 transition-all">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <span className="hidden sm:inline">AttendEase</span>
               </Link>
             </div>
 
@@ -66,6 +71,7 @@ const Layout = ({ children }) => {
               </Link>
               {isAdmin && (
                 <>
+                  <div className="w-px h-6 bg-white/20 mx-1"></div>
                   <Link to="/employees" className={navLinkClass('/employees')}>
                     Employees
                   </Link>
@@ -83,24 +89,28 @@ const Layout = ({ children }) => {
             </div>
 
             {/* Desktop Right Side - Hidden on mobile/tablet */}
-            <div className="hidden xl:flex items-center space-x-2">
+            <div className="hidden xl:flex items-center space-x-3">
               <NotificationBell />
               <Link
                 to="/profile"
-                className="text-white hover:text-blue-200 flex items-center"
+                className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-all group"
               >
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden bg-blue-800">
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold overflow-hidden bg-white/20 ring-2 ring-white/30 group-hover:ring-white/50 transition-all">
                   {user?.photo_url ? (
                     <img src={user.photo_url} alt={user.name} className="w-full h-full object-cover" />
                   ) : (
-                    user?.name?.charAt(0)?.toUpperCase() || 'U'
+                    <span className="text-white">{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
                   )}
                 </span>
+                <span className="text-white text-sm font-medium hidden 2xl:block">{user?.name?.split(' ')[0]}</span>
               </Link>
               <button
                 onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
+                className="flex items-center gap-1.5 bg-white/10 hover:bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all border border-white/20 hover:border-red-500"
               >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
                 Logout
               </button>
             </div>
@@ -110,7 +120,7 @@ const Layout = ({ children }) => {
               <NotificationBell />
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="text-white p-2 rounded-md hover:bg-blue-500 focus:outline-none"
+                className="text-white p-2 rounded-xl hover:bg-white/10 focus:outline-none transition-all"
                 aria-label="Toggle menu"
               >
                 {mobileMenuOpen ? (
@@ -129,15 +139,15 @@ const Layout = ({ children }) => {
 
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
-          <div className="xl:hidden bg-blue-700 border-t border-blue-500">
-            <div className="px-4 py-3 space-y-1">
+          <div className="xl:hidden bg-gradient-to-b from-blue-700 to-indigo-800 border-t border-white/10 animate-fadeIn">
+            <div className="px-4 py-4 space-y-2">
               {/* User Info */}
               <Link
                 to="/profile"
                 onClick={closeMobileMenu}
-                className="flex items-center px-3 py-3 text-white hover:bg-blue-600 rounded-md"
+                className="flex items-center px-4 py-3 text-white bg-white/10 hover:bg-white/20 rounded-2xl transition-all"
               >
-                <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold mr-3 overflow-hidden bg-blue-800">
+                <span className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold mr-4 overflow-hidden bg-white/20 ring-2 ring-white/30">
                   {user?.photo_url ? (
                     <img src={user.photo_url} alt={user.name} className="w-full h-full object-cover" />
                   ) : (
@@ -145,12 +155,15 @@ const Layout = ({ children }) => {
                   )}
                 </span>
                 <div>
-                  <div className="font-medium">{user?.name}</div>
+                  <div className="font-semibold text-lg">{user?.name}</div>
                   <div className="text-sm text-blue-200">{user?.email}</div>
                 </div>
+                <svg className="w-5 h-5 ml-auto text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </Link>
 
-              <hr className="border-blue-500 my-2" />
+              <div className="h-px bg-white/10 my-3"></div>
 
               {/* Navigation Links */}
               <Link to="/" className={mobileNavLinkClass('/')} onClick={closeMobileMenu}>
@@ -212,8 +225,8 @@ const Layout = ({ children }) => {
 
               {isAdmin && (
                 <>
-                  <hr className="border-blue-500 my-2" />
-                  <div className="px-3 py-1 text-xs text-blue-300 uppercase tracking-wider">Admin</div>
+                  <div className="h-px bg-white/10 my-3"></div>
+                  <div className="px-4 py-2 text-xs text-blue-300 uppercase tracking-widest font-semibold">Admin Tools</div>
                   <Link to="/employees" className={mobileNavLinkClass('/employees')} onClick={closeMobileMenu}>
                     <span className="flex items-center">
                       <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,7 +262,7 @@ const Layout = ({ children }) => {
                 </>
               )}
 
-              <hr className="border-blue-500 my-2" />
+              <div className="h-px bg-white/10 my-3"></div>
 
               {/* Logout Button */}
               <button
@@ -257,7 +270,7 @@ const Layout = ({ children }) => {
                   closeMobileMenu();
                   handleLogout();
                 }}
-                className="w-full flex items-center px-3 py-3 text-red-200 hover:bg-red-600 hover:text-white rounded-md transition-colors"
+                className="w-full flex items-center px-4 py-3 text-white bg-red-500/20 hover:bg-red-500 rounded-xl transition-all"
               >
                 <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -268,7 +281,7 @@ const Layout = ({ children }) => {
           </div>
         )}
       </nav>
-      <main className="max-w-7xl mx-auto py-4 sm:py-6 px-3 sm:px-4">{children}</main>
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">{children}</main>
     </div>
   );
 };
