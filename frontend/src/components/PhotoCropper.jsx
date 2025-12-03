@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { loadFaceModels, getFaceDescriptor, validateFaceInImage, descriptorToJson } from '../utils/faceRecognition';
 
 const PhotoCropper = ({ imageFile, onSave, onCancel }) => {
   const [zoom, setZoom] = useState(1);
@@ -7,10 +8,24 @@ const PhotoCropper = ({ imageFile, onSave, onCancel }) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imageUrl, setImageUrl] = useState(null);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [faceStatus, setFaceStatus] = useState({ checking: false, hasFace: false, message: '' });
+  const [saving, setSaving] = useState(false);
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const imgRef = useRef(null);
 
   const CROP_SIZE = 200; // Size of the crop area
+
+  // Load face-api models on mount
+  useEffect(() => {
+    loadFaceModels()
+      .then(() => setModelsLoading(false))
+      .catch((err) => {
+        console.error('Failed to load face models:', err);
+        setModelsLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     if (imageFile) {
@@ -18,17 +33,25 @@ const PhotoCropper = ({ imageFile, onSave, onCancel }) => {
       setImageUrl(url);
 
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         setImageSize({ width: img.width, height: img.height });
         // Calculate initial zoom to fit image in crop area
         const minZoom = Math.max(CROP_SIZE / img.width, CROP_SIZE / img.height);
         setZoom(minZoom);
+        imgRef.current = img;
+
+        // Check for face in image
+        if (!modelsLoading) {
+          setFaceStatus({ checking: true, hasFace: false, message: 'Checking for face...' });
+          const result = await validateFaceInImage(img);
+          setFaceStatus({ checking: false, hasFace: result.hasFace, message: result.message });
+        }
       };
       img.src = url;
 
       return () => URL.revokeObjectURL(url);
     }
-  }, [imageFile]);
+  }, [imageFile, modelsLoading]);
 
   const handleMouseDown = (e) => {
     e.preventDefault();
@@ -96,14 +119,21 @@ const PhotoCropper = ({ imageFile, onSave, onCancel }) => {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!imageUrl || !canvasRef.current) return;
+
+    // Check if face is detected
+    if (!faceStatus.hasFace) {
+      return;
+    }
+
+    setSaving(true);
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const img = new Image();
 
-    img.onload = () => {
+    img.onload = async () => {
       // Set canvas size to desired output size
       const outputSize = 300;
       canvas.width = outputSize;
@@ -127,12 +157,24 @@ const PhotoCropper = ({ imageFile, onSave, onCancel }) => {
 
       ctx.drawImage(img, drawX, drawY, scaledWidth, scaledHeight);
 
+      // Get face descriptor from original image (better quality)
+      let faceDescriptor = null;
+      try {
+        const descriptor = await getFaceDescriptor(imgRef.current);
+        if (descriptor) {
+          faceDescriptor = descriptorToJson(descriptor);
+        }
+      } catch (error) {
+        console.error('Error getting face descriptor:', error);
+      }
+
       // Convert to blob and create file
       canvas.toBlob((blob) => {
         if (blob) {
           const croppedFile = new File([blob], 'profile_cropped.jpg', { type: 'image/jpeg' });
-          onSave(croppedFile, canvas.toDataURL('image/jpeg'));
+          onSave(croppedFile, canvas.toDataURL('image/jpeg'), faceDescriptor);
         }
+        setSaving(false);
       }, 'image/jpeg', 0.9);
     };
 
@@ -171,6 +213,41 @@ const PhotoCropper = ({ imageFile, onSave, onCancel }) => {
           </div>
         </div>
 
+        {/* Face Detection Status */}
+        <div className="mb-3">
+          {modelsLoading ? (
+            <div className="flex items-center justify-center text-blue-600 text-sm">
+              <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Loading face detection...
+            </div>
+          ) : faceStatus.checking ? (
+            <div className="flex items-center justify-center text-blue-600 text-sm">
+              <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Detecting face...
+            </div>
+          ) : faceStatus.hasFace ? (
+            <div className="flex items-center justify-center text-green-600 text-sm">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Face detected successfully!
+            </div>
+          ) : faceStatus.message ? (
+            <div className="flex items-center justify-center text-red-600 text-sm">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {faceStatus.message}
+            </div>
+          ) : null}
+        </div>
+
         {/* Instructions */}
         <p className="text-xs text-gray-500 text-center mb-3">
           Drag to position, use slider to zoom
@@ -199,17 +276,36 @@ const PhotoCropper = ({ imageFile, onSave, onCancel }) => {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            disabled={saving}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={!faceStatus.hasFace || saving || modelsLoading || faceStatus.checking}
+            className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            Save Photo
+            {saving ? (
+              <>
+                <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </>
+            ) : (
+              'Save Photo'
+            )}
           </button>
         </div>
+
+        {/* Help text if no face */}
+        {!faceStatus.hasFace && !faceStatus.checking && !modelsLoading && faceStatus.message && (
+          <p className="text-xs text-center text-gray-500 mt-3">
+            Please upload a clear photo with your face visible to enable face verification during punch.
+          </p>
+        )}
 
         {/* Hidden canvas for cropping */}
         <canvas ref={canvasRef} className="hidden" />

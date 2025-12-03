@@ -80,6 +80,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Address
     address = models.TextField(blank=True)
 
+    # Face Recognition
+    face_descriptor = models.TextField(
+        blank=True,
+        null=True,
+        help_text="128-dimensional face descriptor for face recognition (JSON array)"
+    )
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)

@@ -58,6 +58,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'bank_account_number', 'bank_holder_name', 'bank_name', 'bank_ifsc',
             # Address
             'address',
+            # Face Recognition
+            'face_descriptor',
             # Status
             'has_pending_update'
         ]

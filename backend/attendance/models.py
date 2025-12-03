@@ -139,6 +139,7 @@ class Attendance(models.Model):
     is_off_day = models.BooleanField(default=False, help_text="True if employee worked on their weekly off day")
     is_wfh = models.BooleanField(default=False, help_text="True if employee worked from home")
     is_auto_punch_out = models.BooleanField(default=False, help_text="True if system auto punched out at 11 PM")
+    face_verified = models.BooleanField(default=False, help_text="True if face was verified during punch in")
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

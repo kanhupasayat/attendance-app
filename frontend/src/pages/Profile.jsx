@@ -123,9 +123,12 @@ const Profile = () => {
     }
   };
 
-  const handleCropSave = (croppedFile, croppedPreview) => {
+  const [faceDescriptor, setFaceDescriptor] = useState(null);
+
+  const handleCropSave = (croppedFile, croppedPreview, descriptor) => {
     setPhotoFile(croppedFile);
     setPhotoPreview(croppedPreview);
+    setFaceDescriptor(descriptor);
     setShowCropper(false);
     setRawPhotoFile(null);
   };
@@ -153,6 +156,9 @@ const Profile = () => {
       if (photoFile) data.append('photo', photoFile);
       if (aadhaarPhotoFile) data.append('aadhaar_photo', aadhaarPhotoFile);
       if (panPhotoFile) data.append('pan_photo', panPhotoFile);
+
+      // Add face descriptor if available
+      if (faceDescriptor) data.append('face_descriptor', faceDescriptor);
 
       if (isAdmin) {
         // Admin can directly update
@@ -213,6 +219,7 @@ const Profile = () => {
     setPhotoPreview(null);
     setAadhaarPhotoPreview(null);
     setPanPhotoPreview(null);
+    setFaceDescriptor(null);
   };
 
   const cancelEdit = () => {
