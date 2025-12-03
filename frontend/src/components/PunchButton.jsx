@@ -4,15 +4,23 @@ import { attendanceAPI, leaveAPI } from '../services/api';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { useAuth } from '../context/AuthContext';
 import FaceVerification from './FaceVerification';
+import PunchErrorModal from './PunchErrorModal';
 
 const PunchButton = ({ type, onSuccess, disabled }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [leaveInfo, setLeaveInfo] = useState(null);
   const [pendingCoords, setPendingCoords] = useState(null);
   const { getLocation } = useGeolocation();
+
+  const showError = (message) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
 
   const performPunchIn = async (coords, faceVerified = false) => {
     const api = type === 'in' ? attendanceAPI.punchIn : attendanceAPI.punchOut;
@@ -30,13 +38,13 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
       try {
         coords = await getLocation();
       } catch (geoError) {
-        toast.error(geoError || 'Location access is required. Please enable location permission.');
+        showError(geoError || 'Location access is required. Please enable location permission.');
         setLoading(false);
         return;
       }
 
       if (!coords || !coords.latitude || !coords.longitude) {
-        toast.error('Unable to get your location. Please enable GPS and try again.');
+        showError('Unable to get your location. Please enable GPS and try again.');
         setLoading(false);
         return;
       }
@@ -66,8 +74,9 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
       // No face verification required, proceed with punch
       await performPunchIn(coords, false);
     } catch (error) {
-      const message = error.response?.data?.error || `Failed to punch ${type}`;
-      toast.error(message);
+      const message = error.response?.data?.error ||
+        (error.message?.includes('Network') ? 'No internet connection. Please check your network.' : `Failed to punch ${type}`);
+      showError(message);
     } finally {
       setLoading(false);
     }
@@ -79,8 +88,9 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
     try {
       await performPunchIn(pendingCoords, true);
     } catch (error) {
-      const message = error.response?.data?.error || `Failed to punch ${type}`;
-      toast.error(message);
+      const message = error.response?.data?.error ||
+        (error.message?.includes('Network') ? 'No internet connection. Please check your network.' : `Failed to punch ${type}`);
+      showError(message);
     } finally {
       setLoading(false);
       setPendingCoords(null);
@@ -92,10 +102,10 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
     setPendingCoords(null);
   };
 
-  const handleFaceVerificationError = (errorMessage) => {
+  const handleFaceVerificationError = (errMsg) => {
     setShowFaceVerification(false);
     setPendingCoords(null);
-    toast.error(errorMessage);
+    showError(errMsg || 'Face verification failed');
   };
 
   const handleCancelLeaveAndPunch = async () => {
@@ -114,8 +124,9 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
       setLeaveInfo(null);
       setPendingCoords(null);
     } catch (error) {
-      const message = error.response?.data?.error || 'Failed to cancel leave';
-      toast.error(message);
+      const message = error.response?.data?.error ||
+        (error.message?.includes('Network') ? 'No internet connection. Please check your network.' : 'Failed to cancel leave');
+      showError(message);
     } finally {
       setLoading(false);
     }
@@ -217,6 +228,17 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
           onSuccess={handleFaceVerificationSuccess}
           onCancel={handleFaceVerificationCancel}
           onError={handleFaceVerificationError}
+        />
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <PunchErrorModal
+          error={errorMessage}
+          onClose={() => {
+            setShowErrorModal(false);
+            setErrorMessage('');
+          }}
         />
       )}
     </>
