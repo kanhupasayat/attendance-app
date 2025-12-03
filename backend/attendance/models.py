@@ -92,9 +92,10 @@ class CompOff(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        # Set expiry date (90 days from earned date by default)
+        # Set expiry date to end of the year (31 Dec of earned year)
         if not self.expires_on and self.earned_date:
-            self.expires_on = self.earned_date + timedelta(days=90)
+            from datetime import date
+            self.expires_on = date(self.earned_date.year, 12, 31)
         super().save(*args, **kwargs)
 
     def __str__(self):

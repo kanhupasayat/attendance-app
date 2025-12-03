@@ -428,11 +428,11 @@ const CompOff = () => {
             </li>
             <li className="flex items-start">
               <span className="mr-2">3.</span>
-              <span>Comp off expires 90 days from the earned date</span>
+              <span>Comp off expires on 31st December of the same year</span>
             </li>
             <li className="flex items-start">
               <span className="mr-2">4.</span>
-              <span>Use your comp off as a leave day before it expires</span>
+              <span>Use "Reduce LOP" to convert your LOP days using comp off</span>
             </li>
           </ul>
         </div>
