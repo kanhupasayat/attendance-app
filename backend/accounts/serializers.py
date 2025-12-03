@@ -305,6 +305,9 @@ class ProfileUpdateRequestCreateSerializer(serializers.Serializer):
     aadhaar_photo = serializers.ImageField(required=False)
     pan_photo = serializers.ImageField(required=False)
 
+    # Face descriptor (saved directly without approval)
+    face_descriptor = serializers.CharField(required=False, allow_blank=True)
+
     # Reason for update
     reason = serializers.CharField(required=False, allow_blank=True)
 

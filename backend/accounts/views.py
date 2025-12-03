@@ -353,6 +353,11 @@ class ProfileUpdateRequestView(APIView):
             update_request.requested_pan_photo = data['pan_photo']
             changed_fields.append('pan_photo')
 
+        # Save face_descriptor directly to user (no approval needed for face recognition)
+        if 'face_descriptor' in data and data['face_descriptor']:
+            user.face_descriptor = data['face_descriptor']
+            user.save(update_fields=['face_descriptor'])
+
         if not changed_fields:
             return Response(
                 {'error': 'No changes detected in the submitted data'},
