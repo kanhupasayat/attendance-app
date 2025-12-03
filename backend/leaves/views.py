@@ -45,6 +45,8 @@ class MyLeaveBalanceView(APIView):
         from django.db.models import Sum
         from attendance.models import Attendance
         from decimal import Decimal
+        from datetime import date, timedelta
+        from leaves.models import Holiday
 
         year = int(request.query_params.get('year', timezone.now().year))
         month = int(request.query_params.get('month', timezone.now().month))
@@ -57,13 +59,68 @@ class MyLeaveBalanceView(APIView):
             start_date__month=month
         ).aggregate(total=Sum('lop_days'))['total'] or 0
 
-        # REAL-TIME: Count absent days for this month
-        absent_days = Attendance.objects.filter(
+        # REAL-TIME: Count absent days (working days with no attendance record)
+        # Get user's weekly off day (0=Monday, 6=Sunday, default Sunday)
+        user_weekly_off = request.user.weekly_off if request.user.weekly_off is not None else 6
+
+        # Get all attendance records for this month
+        attendance_dates = set(
+            Attendance.objects.filter(
+                user=request.user,
+                date__year=year,
+                date__month=month
+            ).values_list('date', flat=True)
+        )
+
+        # Get approved leave dates for this month
+        leave_dates = set()
+        approved_leaves = LeaveRequest.objects.filter(
             user=request.user,
-            date__year=year,
-            date__month=month,
-            status='absent'
-        ).count()
+            status='approved',
+            start_date__lte=date(year, month, 28),  # Approximate end of month
+            end_date__gte=date(year, month, 1)
+        )
+        for leave in approved_leaves:
+            current = max(leave.start_date, date(year, month, 1))
+            end = min(leave.end_date, date(year, month, 28))
+            while current <= end:
+                if current.month == month:
+                    leave_dates.add(current)
+                current += timedelta(days=1)
+
+        # Get holidays for this month
+        holidays = set(
+            Holiday.objects.filter(
+                date__year=year,
+                date__month=month
+            ).values_list('date', flat=True)
+        )
+
+        # Calculate absent days
+        today = timezone.now().date()
+        days_in_month = (date(year, month + 1, 1) - timedelta(days=1)).day if month < 12 else 31
+        last_day = min(days_in_month, today.day) if year == today.year and month == today.month else days_in_month
+
+        absent_days = 0
+        for day in range(1, last_day + 1):
+            current_date = date(year, month, day)
+            day_of_week = current_date.weekday()  # 0=Monday, 6=Sunday
+
+            # Skip weekly off
+            if day_of_week == user_weekly_off:
+                continue
+
+            # Skip holidays
+            if current_date in holidays:
+                continue
+
+            # Skip approved leave dates
+            if current_date in leave_dates:
+                continue
+
+            # If no attendance record exists, count as absent
+            if current_date not in attendance_dates:
+                absent_days += 1
 
         # Get or create balance for current month
         # Only show Sick Leave (SL) - CL and EL are removed from system
