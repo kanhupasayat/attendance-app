@@ -199,3 +199,138 @@ export const validateFaceInImage = async (input) => {
     };
   }
 };
+
+/**
+ * Analyze face quality in image with detailed feedback
+ * @param {HTMLImageElement|HTMLVideoElement|HTMLCanvasElement} input
+ * @returns {object} - Detailed quality analysis
+ */
+export const analyzeFaceQuality = async (input) => {
+  if (!modelsLoaded) {
+    await loadFaceModels();
+  }
+
+  try {
+    // Get image dimensions
+    const imgWidth = input.width || input.videoWidth || input.naturalWidth;
+    const imgHeight = input.height || input.videoHeight || input.naturalHeight;
+
+    // Detect face with landmarks
+    const detection = await faceapi
+      .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.3 }))
+      .withFaceLandmarks(true);
+
+    if (!detection) {
+      return {
+        isValid: false,
+        qualityScore: 0,
+        detectionScore: 0,
+        checks: {
+          faceDetected: { pass: false, message: 'No face detected' },
+          faceSize: { pass: false, message: 'Upload a photo with your face' },
+          faceCentered: { pass: false, message: 'Center your face in the photo' },
+        },
+        tips: ['Upload a clear photo with your face visible', 'Make sure there is good lighting'],
+        overallMessage: 'No face detected'
+      };
+    }
+
+    const box = detection.detection.box;
+    const score = detection.detection.score;
+
+    // Calculate face size relative to image
+    const faceArea = box.width * box.height;
+    const imageArea = imgWidth * imgHeight;
+    const faceSizePercent = (faceArea / imageArea) * 100;
+
+    // Check if face is centered
+    const faceCenterX = box.x + box.width / 2;
+    const faceCenterY = box.y + box.height / 2;
+    const imageCenterX = imgWidth / 2;
+    const imageCenterY = imgHeight / 2;
+    const centerOffsetX = Math.abs(faceCenterX - imageCenterX) / imgWidth;
+    const centerOffsetY = Math.abs(faceCenterY - imageCenterY) / imgHeight;
+    const isCentered = centerOffsetX < 0.25 && centerOffsetY < 0.25;
+
+    // Quality checks
+    const checks = {
+      faceDetected: {
+        pass: true,
+        message: 'Face detected',
+        score: Math.round(score * 100)
+      },
+      faceSize: {
+        pass: faceSizePercent >= 5,
+        message: faceSizePercent >= 15 ? 'Good face size' :
+                 faceSizePercent >= 5 ? 'Face could be larger' : 'Face too small',
+        score: Math.min(100, Math.round(faceSizePercent * 5))
+      },
+      faceCentered: {
+        pass: isCentered,
+        message: isCentered ? 'Face centered' : 'Face not centered',
+        score: Math.round((1 - (centerOffsetX + centerOffsetY) / 2) * 100)
+      },
+    };
+
+    // Calculate overall quality score
+    const detectionScore = Math.round(score * 100);
+    const sizeScore = checks.faceSize.score;
+    const centerScore = checks.faceCentered.score;
+
+    // Weighted average: detection 50%, size 30%, center 20%
+    const qualityScore = Math.round(
+      detectionScore * 0.5 +
+      sizeScore * 0.3 +
+      centerScore * 0.2
+    );
+
+    // Generate tips based on issues
+    const tips = [];
+    if (detectionScore < 70) {
+      tips.push('Improve lighting for clearer face detection');
+    }
+    if (!checks.faceSize.pass) {
+      tips.push('Move closer or crop to make your face larger');
+    }
+    if (!checks.faceCentered.pass) {
+      tips.push('Position your face in the center of the photo');
+    }
+    if (tips.length === 0 && qualityScore >= 70) {
+      tips.push('Photo looks good for face verification!');
+    }
+
+    // Overall message
+    let overallMessage = '';
+    if (qualityScore >= 80) {
+      overallMessage = 'Excellent quality!';
+    } else if (qualityScore >= 60) {
+      overallMessage = 'Good quality';
+    } else if (qualityScore >= 40) {
+      overallMessage = 'Fair quality - can be improved';
+    } else {
+      overallMessage = 'Poor quality - please retake';
+    }
+
+    return {
+      isValid: qualityScore >= 40,
+      qualityScore,
+      detectionScore,
+      checks,
+      tips,
+      overallMessage,
+      faceBox: box
+    };
+  } catch (error) {
+    console.error('Error analyzing face quality:', error);
+    return {
+      isValid: false,
+      qualityScore: 0,
+      detectionScore: 0,
+      checks: {
+        faceDetected: { pass: false, message: 'Error processing' },
+      },
+      tips: ['Error processing image. Please try another photo.'],
+      overallMessage: 'Error processing image'
+    };
+  }
+};
