@@ -5,8 +5,7 @@ from .views import (
     AllLeaveRequestsView, ReviewLeaveRequestView, AllLeaveBalancesView,
     InitializeLeaveBalanceView, MonthlyCreditView, NewYearResetView,
     UpdateLeaveBalanceView, UpdateLeaveRequestView, ExportLeaveReportCSVView,
-    HolidayListView, HolidayDetailView, CheckTodayLeaveView, CancelLeaveForDateView,
-    ProcessMonthEndView
+    HolidayListView, HolidayDetailView, CheckTodayLeaveView, CancelLeaveForDateView
 )
 
 urlpatterns = [
@@ -38,7 +37,4 @@ urlpatterns = [
     # Leave-Punch conflict handling
     path('check-today-leave/', CheckTodayLeaveView.as_view(), name='check-today-leave'),
     path('cancel-leave-for-date/', CancelLeaveForDateView.as_view(), name='cancel-leave-for-date'),
-
-    # Cron endpoints
-    path('process-month-end/', ProcessMonthEndView.as_view(), name='process-month-end'),
 ]
