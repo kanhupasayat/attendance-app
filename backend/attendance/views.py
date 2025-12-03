@@ -43,6 +43,7 @@ class PunchInView(APIView):
 
         latitude = serializer.validated_data.get('latitude')
         longitude = serializer.validated_data.get('longitude')
+        face_verified = serializer.validated_data.get('face_verified', False)
         client_ip = get_client_ip(request)
         today = get_india_date()
 
@@ -108,6 +109,7 @@ class PunchInView(APIView):
             existing.punch_in_ip = client_ip
             existing.is_off_day = is_off_day
             existing.is_wfh = is_wfh
+            existing.face_verified = face_verified
             existing.save()
             attendance = existing
         else:
@@ -120,7 +122,8 @@ class PunchInView(APIView):
                 punch_in_longitude=longitude,
                 punch_in_ip=client_ip,
                 is_off_day=is_off_day,
-                is_wfh=is_wfh
+                is_wfh=is_wfh,
+                face_verified=face_verified
             )
 
         msg = "Punch in successful (Work From Home)" if is_wfh else "Punch in successful"

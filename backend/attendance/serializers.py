@@ -18,11 +18,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'user_details', 'date',
             'punch_in', 'punch_out',
-            'status', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out', 'notes',
-            'created_at'
+            'status', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out',
+            'face_verified', 'notes', 'created_at'
         ]
         read_only_fields = [
-            'id', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out', 'created_at'
+            'id', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out',
+            'face_verified', 'created_at'
         ]
 
 
@@ -49,6 +50,7 @@ class AttendanceDetailSerializer(serializers.ModelSerializer):
 class PunchInSerializer(serializers.Serializer):
     latitude = serializers.FloatField(required=False, allow_null=True)
     longitude = serializers.FloatField(required=False, allow_null=True)
+    face_verified = serializers.BooleanField(required=False, default=False)
 
 
 class PunchOutSerializer(serializers.Serializer):

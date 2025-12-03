@@ -2,17 +2,21 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { attendanceAPI, leaveAPI } from '../services/api';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { useAuth } from '../context/AuthContext';
+import FaceVerification from './FaceVerification';
 
 const PunchButton = ({ type, onSuccess, disabled }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [leaveInfo, setLeaveInfo] = useState(null);
   const [pendingCoords, setPendingCoords] = useState(null);
   const { getLocation } = useGeolocation();
 
-  const performPunchIn = async (coords) => {
+  const performPunchIn = async (coords, faceVerified = false) => {
     const api = type === 'in' ? attendanceAPI.punchIn : attendanceAPI.punchOut;
-    await api(coords);
+    await api({ ...coords, face_verified: faceVerified });
     toast.success(`Punch ${type} successful!`);
     onSuccess?.();
   };
@@ -51,14 +55,47 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
         }
       }
 
-      // No leave conflict, proceed with punch
-      await performPunchIn(coords);
+      // Check if face verification is required (only for punch IN and if user has face_descriptor)
+      if (type === 'in' && user?.face_descriptor) {
+        setPendingCoords(coords);
+        setShowFaceVerification(true);
+        setLoading(false);
+        return;
+      }
+
+      // No face verification required, proceed with punch
+      await performPunchIn(coords, false);
     } catch (error) {
       const message = error.response?.data?.error || `Failed to punch ${type}`;
       toast.error(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFaceVerificationSuccess = async (result) => {
+    setShowFaceVerification(false);
+    setLoading(true);
+    try {
+      await performPunchIn(pendingCoords, true);
+    } catch (error) {
+      const message = error.response?.data?.error || `Failed to punch ${type}`;
+      toast.error(message);
+    } finally {
+      setLoading(false);
+      setPendingCoords(null);
+    }
+  };
+
+  const handleFaceVerificationCancel = () => {
+    setShowFaceVerification(false);
+    setPendingCoords(null);
+  };
+
+  const handleFaceVerificationError = (errorMessage) => {
+    setShowFaceVerification(false);
+    setPendingCoords(null);
+    toast.error(errorMessage);
   };
 
   const handleCancelLeaveAndPunch = async () => {
@@ -171,6 +208,16 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Face Verification Modal */}
+      {showFaceVerification && user?.face_descriptor && (
+        <FaceVerification
+          userFaceDescriptor={user.face_descriptor}
+          onSuccess={handleFaceVerificationSuccess}
+          onCancel={handleFaceVerificationCancel}
+          onError={handleFaceVerificationError}
+        />
       )}
     </>
   );

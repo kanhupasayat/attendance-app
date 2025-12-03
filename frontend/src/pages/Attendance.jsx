@@ -269,7 +269,16 @@ const Attendance = () => {
                     <div className="grid grid-cols-3 gap-2 text-xs">
                       <div>
                         <p className="text-gray-500">In</p>
-                        <p className="font-medium text-green-600">{formatTime(record.punch_in)}</p>
+                        <p className="font-medium text-green-600">
+                          {formatTime(record.punch_in)}
+                          {record.face_verified && (
+                            <span className="ml-1 text-green-500" title="Face Verified">
+                              <svg className="w-3 h-3 inline" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-500">Out</p>
@@ -347,6 +356,13 @@ const Attendance = () => {
                         </td>
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatTime(record.punch_in)}
+                          {record.face_verified && (
+                            <span className="ml-1 text-green-500" title="Face Verified">
+                              <svg className="w-4 h-4 inline" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatTime(record.punch_out)}
