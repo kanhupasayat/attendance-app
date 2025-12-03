@@ -353,10 +353,9 @@ class ProfileUpdateRequestView(APIView):
             update_request.requested_pan_photo = data['pan_photo']
             changed_fields.append('pan_photo')
 
-        # Save face_descriptor directly to user (no approval needed for face recognition)
+        # Save face_descriptor to request (will be applied on approval)
         if 'face_descriptor' in data and data['face_descriptor']:
-            user.face_descriptor = data['face_descriptor']
-            user.save(update_fields=['face_descriptor'])
+            update_request.requested_face_descriptor = data['face_descriptor']
 
         if not changed_fields:
             return Response(
@@ -434,7 +433,8 @@ class ReviewProfileUpdateRequestView(APIView):
                 'requested_aadhaar_number', 'requested_pan_number',
                 'requested_bank_account_number', 'requested_bank_holder_name',
                 'requested_bank_name', 'requested_bank_ifsc', 'requested_address',
-                'requested_photo', 'requested_aadhaar_photo', 'requested_pan_photo'
+                'requested_photo', 'requested_aadhaar_photo', 'requested_pan_photo',
+                'requested_face_descriptor'
             ).first()
 
             if not request_data:
@@ -492,6 +492,10 @@ class ReviewProfileUpdateRequestView(APIView):
                 user_updates['aadhaar_photo'] = request_data['requested_aadhaar_photo']
             if request_data.get('requested_pan_photo'):
                 user_updates['pan_photo'] = request_data['requested_pan_photo']
+
+            # Handle face_descriptor (saved with photo approval)
+            if request_data.get('requested_face_descriptor'):
+                user_updates['face_descriptor'] = request_data['requested_face_descriptor']
 
             # Direct database update - no file operations
             if user_updates:

@@ -171,8 +171,6 @@ const Profile = () => {
         await authAPI.submitProfileUpdateRequest(data);
         toast.success('Profile update request submitted! Waiting for admin approval.');
         fetchPendingRequests();
-        // Refresh user to get updated face_descriptor (saved directly)
-        await refreshUser();
       }
 
       setEditMode(false);

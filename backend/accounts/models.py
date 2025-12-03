@@ -188,6 +188,9 @@ class ProfileUpdateRequest(models.Model):
     requested_aadhaar_photo = models.ImageField(upload_to='profile_update_requests/aadhaar/', blank=True, null=True)
     requested_pan_photo = models.ImageField(upload_to='profile_update_requests/pan/', blank=True, null=True)
 
+    # Face descriptor (saved with photo, applied on approval)
+    requested_face_descriptor = models.TextField(blank=True, null=True, help_text="Face descriptor to be saved on approval")
+
     # Track what fields are being changed
     changed_fields = models.TextField(help_text="Comma-separated list of fields being changed")
 
