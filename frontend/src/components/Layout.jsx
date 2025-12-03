@@ -17,7 +17,7 @@ const Layout = ({ children }) => {
   const isActive = (path) => location.pathname === path;
 
   const navLinkClass = (path) =>
-    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+    `px-2 xl:px-3 py-2 rounded-md text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
       isActive(path)
         ? 'bg-blue-700 text-white'
         : 'text-blue-100 hover:bg-blue-500 hover:text-white'
@@ -35,81 +35,78 @@ const Layout = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-blue-600 shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-between h-16">
-            {/* Logo and Desktop Navigation */}
+        <div className="max-w-7xl mx-auto px-2 sm:px-4">
+          <div className="flex justify-between h-14 sm:h-16">
+            {/* Logo */}
             <div className="flex items-center">
-              <Link to="/" className="text-white font-bold text-lg sm:text-xl">
-                Attendance System
+              <Link to="/" className="text-white font-bold text-base sm:text-lg xl:text-xl whitespace-nowrap">
+                Attendance
               </Link>
-              {/* Desktop Navigation - Hidden on mobile */}
-              <div className="hidden lg:flex ml-10 items-baseline space-x-2">
-                <Link to="/" className={navLinkClass('/')}>
-                  Dashboard
-                </Link>
-                <Link to="/attendance" className={navLinkClass('/attendance')}>
-                  Attendance
-                </Link>
-                <Link to="/leaves" className={navLinkClass('/leaves')}>
-                  Leaves
-                </Link>
-                <Link to="/holidays" className={navLinkClass('/holidays')}>
-                  Holidays
-                </Link>
-                <Link to="/wfh" className={navLinkClass('/wfh')}>
-                  WFH
-                </Link>
-                <Link to="/comp-off" className={navLinkClass('/comp-off')}>
-                  Comp Off
-                </Link>
-                <Link to="/profile" className={navLinkClass('/profile')}>
-                  Profile
-                </Link>
-                {isAdmin && (
-                  <>
-                    <Link to="/employees" className={navLinkClass('/employees')}>
-                      Employees
-                    </Link>
-                    <Link to="/profile-requests" className={navLinkClass('/profile-requests')}>
-                      Requests
-                    </Link>
-                    <Link to="/shifts" className={navLinkClass('/shifts')}>
-                      Shifts
-                    </Link>
-                    <Link to="/reports" className={navLinkClass('/reports')}>
-                      Reports
-                    </Link>
-                  </>
-                )}
-              </div>
             </div>
 
-            {/* Desktop Right Side - Hidden on mobile */}
-            <div className="hidden lg:flex items-center space-x-2">
+            {/* Desktop Navigation - Hidden on mobile/tablet */}
+            <div className="hidden xl:flex items-center space-x-1">
+              <Link to="/" className={navLinkClass('/')}>
+                Dashboard
+              </Link>
+              <Link to="/attendance" className={navLinkClass('/attendance')}>
+                Attendance
+              </Link>
+              <Link to="/leaves" className={navLinkClass('/leaves')}>
+                Leaves
+              </Link>
+              <Link to="/holidays" className={navLinkClass('/holidays')}>
+                Holidays
+              </Link>
+              <Link to="/wfh" className={navLinkClass('/wfh')}>
+                WFH
+              </Link>
+              <Link to="/comp-off" className={navLinkClass('/comp-off')}>
+                Comp Off
+              </Link>
+              {isAdmin && (
+                <>
+                  <Link to="/employees" className={navLinkClass('/employees')}>
+                    Employees
+                  </Link>
+                  <Link to="/profile-requests" className={navLinkClass('/profile-requests')}>
+                    Requests
+                  </Link>
+                  <Link to="/shifts" className={navLinkClass('/shifts')}>
+                    Shifts
+                  </Link>
+                  <Link to="/reports" className={navLinkClass('/reports')}>
+                    Reports
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Desktop Right Side - Hidden on mobile/tablet */}
+            <div className="hidden xl:flex items-center space-x-2">
               <NotificationBell />
               <Link
                 to="/profile"
                 className="text-white hover:text-blue-200 flex items-center"
               >
-                <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-2 overflow-hidden bg-blue-800">
+                <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold overflow-hidden bg-blue-800">
                   {user?.photo_url ? (
                     <img src={user.photo_url} alt={user.name} className="w-full h-full object-cover" />
                   ) : (
                     user?.name?.charAt(0)?.toUpperCase() || 'U'
                   )}
                 </span>
-                <span className="hidden xl:inline">{user?.name}</span>
               </Link>
               <button
                 onClick={handleLogout}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm transition-colors"
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
               >
                 Logout
               </button>
             </div>
 
-            {/* Mobile: Notification + Hamburger */}
-            <div className="flex lg:hidden items-center space-x-2">
+            {/* Mobile/Tablet: Notification + Hamburger */}
+            <div className="flex xl:hidden items-center space-x-2">
               <NotificationBell />
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -132,7 +129,7 @@ const Layout = ({ children }) => {
 
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-blue-700 border-t border-blue-500">
+          <div className="xl:hidden bg-blue-700 border-t border-blue-500">
             <div className="px-4 py-3 space-y-1">
               {/* User Info */}
               <Link
