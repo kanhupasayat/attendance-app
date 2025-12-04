@@ -161,6 +161,122 @@ class Notification(models.Model):
         return f"{self.title} - {self.user.name}"
 
 
+class ActivityLog(models.Model):
+    """
+    Activity Log model to track all system activities
+    """
+    ACTIVITY_TYPES = (
+        # Attendance
+        ('punch_in', 'Punch In'),
+        ('punch_out', 'Punch Out'),
+        ('attendance_edit', 'Attendance Edit'),
+        ('punch_out_cleared', 'Punch Out Cleared'),
+        # Leave
+        ('leave_applied', 'Leave Applied'),
+        ('leave_approved', 'Leave Approved'),
+        ('leave_rejected', 'Leave Rejected'),
+        ('leave_cancelled', 'Leave Cancelled'),
+        # Regularization
+        ('regularization_applied', 'Regularization Applied'),
+        ('regularization_approved', 'Regularization Approved'),
+        ('regularization_rejected', 'Regularization Rejected'),
+        # WFH
+        ('wfh_applied', 'WFH Applied'),
+        ('wfh_approved', 'WFH Approved'),
+        ('wfh_rejected', 'WFH Rejected'),
+        # Employee
+        ('employee_added', 'Employee Added'),
+        ('employee_updated', 'Employee Updated'),
+        ('employee_deactivated', 'Employee Deactivated'),
+        # Profile Update
+        ('profile_update_requested', 'Profile Update Requested'),
+        ('profile_update_approved', 'Profile Update Approved'),
+        ('profile_update_rejected', 'Profile Update Rejected'),
+        # Shift
+        ('shift_created', 'Shift Created'),
+        ('shift_updated', 'Shift Updated'),
+        ('shift_deleted', 'Shift Deleted'),
+        # Holiday
+        ('holiday_added', 'Holiday Added'),
+        ('holiday_updated', 'Holiday Updated'),
+        ('holiday_deleted', 'Holiday Deleted'),
+        # Comp Off
+        ('comp_off_earned', 'Comp Off Earned'),
+        ('comp_off_used', 'Comp Off Used'),
+        # Leave Type
+        ('leave_type_created', 'Leave Type Created'),
+        ('leave_type_updated', 'Leave Type Updated'),
+        # System
+        ('system', 'System'),
+    )
+
+    CATEGORY_CHOICES = (
+        ('attendance', 'Attendance'),
+        ('leave', 'Leave'),
+        ('regularization', 'Regularization'),
+        ('wfh', 'WFH'),
+        ('employee', 'Employee'),
+        ('profile', 'Profile'),
+        ('shift', 'Shift'),
+        ('holiday', 'Holiday'),
+        ('comp_off', 'Comp Off'),
+        ('leave_type', 'Leave Type'),
+        ('system', 'System'),
+    )
+
+    # Who performed the action
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='activities_performed',
+        help_text="User who performed this action"
+    )
+
+    # Who is affected by the action (optional - for actions on behalf of someone)
+    target_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='activities_affected',
+        help_text="User affected by this action"
+    )
+
+    activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPES)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+
+    # Reference to related object (generic)
+    related_model = models.CharField(max_length=50, blank=True, help_text="Model name of related object")
+    related_id = models.IntegerField(null=True, blank=True, help_text="ID of related object")
+
+    # Additional data as JSON
+    extra_data = models.JSONField(null=True, blank=True, help_text="Additional context data")
+
+    # IP and location for audit
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'activity_logs'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['actor', 'created_at']),
+            models.Index(fields=['target_user', 'created_at']),
+            models.Index(fields=['category', 'created_at']),
+            models.Index(fields=['activity_type', 'created_at']),
+            models.Index(fields=['-created_at']),
+        ]
+
+    def __str__(self):
+        actor_name = self.actor.name if self.actor else 'System'
+        return f"{actor_name} - {self.title}"
+
+
 class ProfileUpdateRequest(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),

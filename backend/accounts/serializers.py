@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, OTP, Notification, ProfileUpdateRequest
+from .models import User, OTP, Notification, ProfileUpdateRequest, ActivityLog
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -331,3 +331,59 @@ class ProfileUpdateRequestCreateSerializer(serializers.Serializer):
             from .image_utils import compress_document_photo
             return compress_document_photo(value)
         return value
+
+
+class ActivityLogSerializer(serializers.ModelSerializer):
+    """Serializer for Activity Log"""
+    actor_name = serializers.SerializerMethodField()
+    actor_photo = serializers.SerializerMethodField()
+    target_user_name = serializers.SerializerMethodField()
+    time_ago = serializers.SerializerMethodField()
+    formatted_time = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ActivityLog
+        fields = [
+            'id', 'actor', 'actor_name', 'actor_photo',
+            'target_user', 'target_user_name',
+            'activity_type', 'category', 'title', 'description',
+            'related_model', 'related_id', 'extra_data',
+            'created_at', 'time_ago', 'formatted_time'
+        ]
+
+    def get_actor_name(self, obj):
+        return obj.actor.name if obj.actor else 'System'
+
+    def get_actor_photo(self, obj):
+        if obj.actor and obj.actor.photo:
+            return obj.actor.photo.url
+        return None
+
+    def get_target_user_name(self, obj):
+        return obj.target_user.name if obj.target_user else None
+
+    def get_time_ago(self, obj):
+        from django.utils import timezone
+        now = timezone.now()
+        diff = now - obj.created_at
+
+        seconds = diff.total_seconds()
+        if seconds < 60:
+            return 'Just now'
+        elif seconds < 3600:
+            minutes = int(seconds / 60)
+            return f'{minutes}m ago'
+        elif seconds < 86400:
+            hours = int(seconds / 3600)
+            return f'{hours}h ago'
+        elif seconds < 604800:
+            days = int(seconds / 86400)
+            return f'{days}d ago'
+        else:
+            return obj.created_at.strftime('%d %b')
+
+    def get_formatted_time(self, obj):
+        import pytz
+        ist = pytz.timezone('Asia/Kolkata')
+        local_time = obj.created_at.astimezone(ist)
+        return local_time.strftime('%I:%M %p')

@@ -6,6 +6,8 @@ from .views import (
     CheckAdminExistsView, AdminDashboardStatsView, TodayEmployeeStatusView,
     NotificationListView, UnreadNotificationCountView, MarkNotificationReadView,
     MarkAllNotificationsReadView, ClearNotificationsView,
+    # Activity Log
+    ActivityLogListView,
     # Profile Update Request Views
     ProfileUpdateRequestView, MyProfileUpdateRequestsView, CancelProfileUpdateRequestView,
     AllProfileUpdateRequestsView, ReviewProfileUpdateRequestView
@@ -49,4 +51,7 @@ urlpatterns = [
     path('notifications/read/<int:pk>/', MarkNotificationReadView.as_view(), name='notification-read'),
     path('notifications/read-all/', MarkAllNotificationsReadView.as_view(), name='notifications-read-all'),
     path('notifications/clear/', ClearNotificationsView.as_view(), name='notifications-clear'),
+
+    # Activity Log
+    path('activity-log/', ActivityLogListView.as_view(), name='activity-log'),
 ]

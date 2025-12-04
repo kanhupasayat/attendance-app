@@ -20,6 +20,7 @@ from .serializers import (
 )
 from accounts.views import IsAdminUser
 from accounts.utils import notify_leave_applied, notify_leave_status
+from accounts.activity_utils import log_leave_applied, log_leave_reviewed, log_holiday_added
 
 
 class LeaveTypeListView(generics.ListCreateAPIView):
@@ -462,6 +463,12 @@ class LeaveApplyView(APIView):
         # Notify admins about new leave request
         notify_leave_applied(leave_request)
 
+        # Log activity
+        try:
+            log_leave_applied(request.user, leave_request, request)
+        except Exception:
+            pass
+
         return Response({
             "message": "Leave request submitted",
             "breakdown": {
@@ -630,6 +637,12 @@ class ReviewLeaveRequestView(APIView):
 
         # Notify employee about leave status (with email)
         notify_leave_status(leave_request, new_status, remarks)
+
+        # Log activity
+        try:
+            log_leave_reviewed(request.user, leave_request, new_status, request)
+        except Exception:
+            pass
 
         return Response({
             "message": f"Leave request {new_status}",

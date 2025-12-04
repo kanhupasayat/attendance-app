@@ -30,6 +30,11 @@ from accounts.utils import (
     notify_regularization_applied, notify_regularization_status,
     notify_wfh_applied, notify_wfh_status
 )
+from accounts.activity_utils import (
+    log_punch_in, log_punch_out, log_regularization_applied,
+    log_regularization_reviewed, log_attendance_edit, log_wfh_applied,
+    log_wfh_reviewed, log_shift_created, log_holiday_added
+)
 
 
 class PunchInView(APIView):
@@ -125,6 +130,12 @@ class PunchInView(APIView):
                 is_wfh=is_wfh,
                 face_verified=face_verified
             )
+
+        # Log activity
+        try:
+            log_punch_in(request.user, attendance, request)
+        except Exception:
+            pass  # Don't fail punch in if logging fails
 
         msg = "Punch in successful (Work From Home)" if is_wfh else "Punch in successful"
         if leave_cancelled_msg:
@@ -386,6 +397,12 @@ class PunchOutView(APIView):
         attendance.punch_out_longitude = longitude
         attendance.punch_out_ip = client_ip
         attendance.save()  # This will calculate working hours
+
+        # Log activity
+        try:
+            log_punch_out(request.user, attendance, request)
+        except Exception:
+            pass  # Don't fail punch out if logging fails
 
         msg = "Punch out successful (Work From Home)" if is_wfh else "Punch out successful"
         return Response({

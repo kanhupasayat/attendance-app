@@ -5,14 +5,16 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.utils import timezone
 
-from .models import User, OTP, Notification, ProfileUpdateRequest
+from .models import User, OTP, Notification, ProfileUpdateRequest, ActivityLog
 from .serializers import (
     UserSerializer, UserProfileSerializer, UserCreateSerializer, AdminSignupSerializer,
     LoginSerializer, OTPRequestSerializer, OTPVerifySerializer,
     ChangePasswordSerializer, NotificationSerializer,
-    ProfileUpdateRequestSerializer, ProfileUpdateRequestCreateSerializer
+    ProfileUpdateRequestSerializer, ProfileUpdateRequestCreateSerializer,
+    ActivityLogSerializer
 )
 from .utils import notify_profile_update_applied, notify_profile_update_status
+from .activity_utils import log_activity
 
 
 class IsAdminUser(permissions.BasePermission):
@@ -378,6 +380,40 @@ class ClearNotificationsView(APIView):
     def post(self, request):
         Notification.objects.filter(user=request.user, is_read=True).delete()
         return Response({'message': 'Notifications cleared'})
+
+
+# Activity Log Views
+class ActivityLogListView(generics.ListAPIView):
+    """Get activity logs - Admin sees all, Employee sees their own"""
+    serializer_class = ActivityLogSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ActivityLog.objects.all()
+
+        # If not admin, only show their own activities
+        if not user.is_admin:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(actor=user) | Q(target_user=user)
+            )
+
+        # Filter by category
+        category = self.request.query_params.get('category')
+        if category and category != 'all':
+            queryset = queryset.filter(category=category)
+
+        # Filter by date
+        date = self.request.query_params.get('date')
+        if date:
+            queryset = queryset.filter(created_at__date=date)
+
+        # Filter by actor (admin only)
+        actor_id = self.request.query_params.get('actor')
+        if actor_id and user.is_admin:
+            queryset = queryset.filter(actor_id=actor_id)
+
+        return queryset[:100]  # Limit to last 100 activities
 
 
 # Profile Update Request Views

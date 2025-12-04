@@ -7,6 +7,7 @@ import { attendanceAPI, leaveAPI, authAPI } from '../services/api';
 import Layout from '../components/Layout';
 import PunchButton from '../components/PunchButton';
 import AttendanceCalendar from '../components/AttendanceCalendar';
+import ActivityTimeline from '../components/ActivityTimeline';
 
 // Function to generate consistent color based on name
 const stringToColor = (string) => {
@@ -432,6 +433,9 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+
+        {/* Activity Timeline for Employees */}
+        {!isAdmin && <ActivityTimeline />}
 
         {/* Off-Day Work Stats for Employees */}
         {!isAdmin && offDayStats && offDayStats.total_off_day_work > 0 && (
@@ -1017,6 +1021,9 @@ const Dashboard = () => {
                 })()}
               </div>
             )}
+
+            {/* Activity Timeline */}
+            <ActivityTimeline />
 
             {/* Leave Statistics */}
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
