@@ -19,6 +19,13 @@ def send_email_via_brevo(to_email, to_name, subject, html_content, text_content=
     """
     Send email using Brevo HTTP API (works on Render)
     """
+    # Check if API key is set
+    if not BREVO_API_KEY:
+        logger.error("BREVO_API_KEY is not set in environment variables!")
+        return False
+
+    logger.info(f"Brevo API Key present: {bool(BREVO_API_KEY)} (length: {len(BREVO_API_KEY)})")
+
     url = "https://api.brevo.com/v3/smtp/email"
 
     headers = {
@@ -29,6 +36,8 @@ def send_email_via_brevo(to_email, to_name, subject, html_content, text_content=
 
     sender_email = os.environ.get('SENDER_EMAIL', 'kanhupasayat1@gmail.com')
     sender_name = os.environ.get('SENDER_NAME', 'Attendance System')
+
+    logger.info(f"Sending email to: {to_email}, from: {sender_email}")
 
     payload = {
         "sender": {"name": sender_name, "email": sender_email},
@@ -42,6 +51,7 @@ def send_email_via_brevo(to_email, to_name, subject, html_content, text_content=
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
+        logger.info(f"Brevo API response: {response.status_code}")
         if response.status_code == 201:
             logger.info(f"Email sent successfully via Brevo to {to_email}")
             return True

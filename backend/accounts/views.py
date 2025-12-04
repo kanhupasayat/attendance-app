@@ -75,6 +75,9 @@ class OTPRequestView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        import logging
+        logger = logging.getLogger(__name__)
+
         serializer = OTPRequestSerializer(data=request.data)
         if serializer.is_valid():
             mobile = serializer.validated_data['mobile']
@@ -87,8 +90,12 @@ class OTPRequestView(APIView):
             )
 
             # Send OTP via email (async - non-blocking)
+            logger.info(f"OTP created for user {user.name}, email: {user.email}")
             if user.email:
+                logger.info(f"Sending OTP email to {user.email}")
                 send_email_async(send_otp_email, user, otp.otp)
+            else:
+                logger.warning(f"User {user.name} has no email set!")
 
             return Response({
                 "message": "OTP sent successfully",

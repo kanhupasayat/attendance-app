@@ -4,11 +4,16 @@ from .models import Notification, User
 
 def send_email_async(email_func, *args, **kwargs):
     """Send email in a separate thread to avoid blocking"""
+    import logging
+    logger = logging.getLogger(__name__)
+
     def run():
         try:
-            email_func(*args, **kwargs)
+            logger.info(f"Attempting to send email via {email_func.__name__}")
+            result = email_func(*args, **kwargs)
+            logger.info(f"Email function {email_func.__name__} returned: {result}")
         except Exception as e:
-            print(f"Email sending failed: {e}")
+            logger.error(f"Email sending failed: {e}", exc_info=True)
 
     thread = threading.Thread(target=run)
     thread.daemon = True
