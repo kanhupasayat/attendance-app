@@ -174,11 +174,12 @@ ANNUAL_SICK_LEAVE = 6
 ANNUAL_EARNED_LEAVE = 15
 MAX_CARRY_FORWARD_EARNED_LEAVE = 30
 
-# Email Settings (Brevo SMTP)
+# Email Settings (Brevo SMTP with SSL)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp-relay.brevo.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_USE_TLS = False
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '9d5976001@smtp-brevo.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Attendance System <noreply@attendance.com>')
