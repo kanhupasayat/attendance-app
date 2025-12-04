@@ -246,8 +246,11 @@ class TodayEmployeeStatusView(APIView):
 
     def get(self, request):
         from attendance.models import Attendance
+        import pytz
 
-        today = timezone.now().date()
+        # IST timezone
+        ist = pytz.timezone('Asia/Kolkata')
+        today = timezone.now().astimezone(ist).date()
 
         # Get all active employees
         employees = User.objects.filter(
@@ -260,15 +263,17 @@ class TodayEmployeeStatusView(APIView):
             for att in Attendance.objects.filter(date=today).select_related('user')
         }
 
+        # Format time helper - convert to IST
+        def format_time(dt):
+            if not dt:
+                return None
+            # Convert to IST timezone
+            dt_ist = dt.astimezone(ist)
+            return dt_ist.strftime('%I:%M %p')
+
         result = []
         for emp in employees:
             attendance = today_attendance.get(emp.id)
-
-            # Format time helper
-            def format_time(dt):
-                if not dt:
-                    return None
-                return dt.strftime('%I:%M %p')
 
             # Determine status
             if attendance:
