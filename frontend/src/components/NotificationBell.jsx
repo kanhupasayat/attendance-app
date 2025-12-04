@@ -144,13 +144,19 @@ const NotificationBell = () => {
   // Get the route to navigate based on notification type
   const getNotificationRoute = (type) => {
     // Leave related
-    if (type.includes('leave')) return '/leaves';
+    if (type.includes('leave')) {
+      return '/leaves';
+    }
 
     // Regularization related
-    if (type.includes('regularization')) return '/regularization';
+    if (type.includes('regularization')) {
+      return '/regularization';
+    }
 
-    // WFH (Work From Home) related
-    if (type.includes('wfh')) return '/regularization'; // WFH is in regularization page
+    // WFH (Work From Home) related - has its own page
+    if (type.includes('wfh')) {
+      return '/wfh';
+    }
 
     // Profile update related
     if (type.includes('profile_update')) {
@@ -163,7 +169,12 @@ const NotificationBell = () => {
     }
 
     // Holiday notification
-    if (type === 'holiday') return '/leaves'; // Holidays shown in leaves page
+    if (type === 'holiday') return '/holidays';
+
+    // Comp-off related
+    if (type.includes('comp_off')) {
+      return '/comp-off';
+    }
 
     // System notification - go to dashboard
     if (type === 'system') return '/';

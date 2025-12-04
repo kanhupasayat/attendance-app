@@ -13,8 +13,7 @@ from .serializers import (
     ProfileUpdateRequestSerializer, ProfileUpdateRequestCreateSerializer,
     ActivityLogSerializer
 )
-from .utils import notify_profile_update_applied, notify_profile_update_status, send_email_async
-from .email_utils import send_otp_email
+from .utils import notify_profile_update_applied, notify_profile_update_status
 from .activity_utils import (
     log_activity, log_employee_added, log_employee_updated, log_employee_deactivated,
     log_profile_update_requested, log_profile_update_reviewed
@@ -75,9 +74,6 @@ class OTPRequestView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        import logging
-        logger = logging.getLogger(__name__)
-
         serializer = OTPRequestSerializer(data=request.data)
         if serializer.is_valid():
             mobile = serializer.validated_data['mobile']
@@ -89,18 +85,9 @@ class OTPRequestView(APIView):
                 expires_at=timezone.now() + timezone.timedelta(minutes=10)
             )
 
-            # Send OTP via email (async - non-blocking)
-            logger.info(f"OTP created for user {user.name}, email: {user.email}")
-            if user.email:
-                logger.info(f"Sending OTP email to {user.email}")
-                send_email_async(send_otp_email, user, otp.otp)
-            else:
-                logger.warning(f"User {user.name} has no email set!")
-
             return Response({
-                "message": "OTP sent successfully",
-                "otp": otp.otp,  # For development - remove in production
-                "email_hint": user.email[:3] + "***" + user.email[user.email.index('@'):] if user.email else None
+                "message": "OTP generated successfully",
+                "otp": otp.otp,  # OTP returned in response for verification
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -710,7 +697,8 @@ class ReviewProfileUpdateRequestView(APIView):
 
         # Log activity
         try:
-            log_profile_update_reviewed(request.user, update_request, action, request)
+            update_request_obj = ProfileUpdateRequest.objects.get(pk=pk)
+            log_profile_update_reviewed(request.user, update_request_obj, action, request)
         except Exception:
             pass
 
