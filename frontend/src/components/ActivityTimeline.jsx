@@ -201,7 +201,7 @@ const ActivityTimeline = () => {
           <p>No activities yet</p>
         </div>
       ) : (
-        <div className="space-y-6 max-h-[500px] overflow-y-auto">
+        <div className="space-y-4 max-h-[500px] overflow-y-auto overflow-x-hidden pr-1">
           {Object.entries(groupedActivities).map(([date, items]) => (
             <div key={date}>
               <div className="sticky top-0 bg-white py-2 z-10">
@@ -209,54 +209,65 @@ const ActivityTimeline = () => {
                   {date}
                 </span>
               </div>
-              <div className="space-y-3 mt-2">
+              <div className="space-y-2 mt-2">
                 {items.map((activity) => (
                   <div
                     key={activity.id}
-                    className={`flex gap-3 p-3 rounded-lg border ${getActivityColor(activity.category)}`}
+                    className={`p-3 rounded-lg border ${getActivityColor(activity.category)} overflow-hidden`}
                   >
-                    <div className="flex-shrink-0">
-                      {activity.actor_photo ? (
-                        <Avatar
-                          src={activity.actor_photo}
-                          alt={activity.actor_name}
-                          sx={{ width: 40, height: 40 }}
-                        />
-                      ) : (
-                        <Avatar
-                          sx={{
-                            width: 40,
-                            height: 40,
-                            bgcolor: stringToColor(activity.actor_name || 'System'),
-                            fontSize: '0.9rem',
-                          }}
-                        >
-                          {activity.actor_name?.charAt(0)?.toUpperCase() || 'S'}
-                        </Avatar>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
-                            <span>{getActivityIcon(activity.activity_type)}</span>
+                    {/* Mobile Layout */}
+                    <div className="flex gap-2 sm:gap-3">
+                      {/* Avatar - smaller on mobile */}
+                      <div className="flex-shrink-0">
+                        {activity.actor_photo ? (
+                          <Avatar
+                            src={activity.actor_photo}
+                            alt={activity.actor_name}
+                            sx={{ width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}
+                          />
+                        ) : (
+                          <Avatar
+                            sx={{
+                              width: { xs: 32, sm: 40 },
+                              height: { xs: 32, sm: 40 },
+                              bgcolor: stringToColor(activity.actor_name || 'System'),
+                              fontSize: { xs: '0.75rem', sm: '0.9rem' },
+                            }}
+                          >
+                            {activity.actor_name?.charAt(0)?.toUpperCase() || 'S'}
+                          </Avatar>
+                        )}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        {/* Title Row */}
+                        <div className="flex items-start justify-between gap-1">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-center gap-1 min-w-0">
+                            <span className="flex-shrink-0">{getActivityIcon(activity.activity_type)}</span>
                             <span className="truncate">{activity.title}</span>
                           </p>
-                          {activity.description && (
-                            <p className="text-xs text-gray-600 mt-0.5">{activity.description}</p>
+                          <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
+                            {activity.formatted_time}
+                          </span>
+                        </div>
+
+                        {/* Description - with proper text wrap */}
+                        {activity.description && (
+                          <p className="text-[11px] sm:text-xs text-gray-600 mt-1 break-words line-clamp-2">
+                            {activity.description}
+                          </p>
+                        )}
+
+                        {/* Meta info */}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                          <span className="text-[10px] sm:text-xs text-gray-500">{activity.time_ago}</span>
+                          {isAdmin && activity.target_user_name && activity.target_user_name !== activity.actor_name && (
+                            <span className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[120px] sm:max-w-none">
+                              • For: {activity.target_user_name}
+                            </span>
                           )}
                         </div>
-                        <span className="text-xs text-gray-500 whitespace-nowrap">
-                          {activity.formatted_time}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-gray-500">{activity.time_ago}</span>
-                        {isAdmin && activity.target_user_name && activity.target_user_name !== activity.actor_name && (
-                          <span className="text-xs text-gray-500">
-                            • For: {activity.target_user_name}
-                          </span>
-                        )}
                       </div>
                     </div>
                   </div>
