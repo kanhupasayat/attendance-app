@@ -14,7 +14,10 @@ from .serializers import (
     ActivityLogSerializer
 )
 from .utils import notify_profile_update_applied, notify_profile_update_status
-from .activity_utils import log_activity
+from .activity_utils import (
+    log_activity, log_employee_added, log_employee_updated,
+    log_profile_update_requested, log_profile_update_reviewed
+)
 
 
 class IsAdminUser(permissions.BasePermission):
@@ -169,6 +172,11 @@ class EmployeeListView(generics.ListCreateAPIView):
         serializer = UserCreateSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+            # Log activity
+            try:
+                log_employee_added(request.user, user, request)
+            except Exception:
+                pass
             return Response(
                 UserSerializer(user).data,
                 status=status.HTTP_201_CREATED
@@ -180,6 +188,25 @@ class EmployeeDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = UserProfileSerializer
     queryset = User.objects.filter(role='employee')
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Track changed fields
+        old_data = {field: getattr(instance, field) for field in ['name', 'email', 'department', 'designation', 'mobile', 'shift_id', 'weekly_off', 'is_active']}
+
+        response = super().update(request, *args, **kwargs)
+
+        # Find changed fields
+        instance.refresh_from_db()
+        changed_fields = [field for field, value in old_data.items() if getattr(instance, field) != value]
+
+        if changed_fields:
+            try:
+                log_employee_updated(request.user, instance, changed_fields, request)
+            except Exception:
+                pass
+
+        return response
 
 
 class CheckAdminExistsView(APIView):
@@ -494,6 +521,12 @@ class ProfileUpdateRequestView(APIView):
         # Notify all admins (with email)
         notify_profile_update_applied(update_request)
 
+        # Log activity
+        try:
+            log_profile_update_requested(request.user, update_request, request)
+        except Exception:
+            pass
+
         return Response({
             'message': 'Profile update request submitted successfully. Waiting for admin approval.',
             'request_id': update_request.id,
@@ -638,6 +671,12 @@ class ReviewProfileUpdateRequestView(APIView):
             )
         except Exception:
             pass  # Ignore notification errors
+
+        # Log activity
+        try:
+            log_profile_update_reviewed(request.user, update_request, action, request)
+        except Exception:
+            pass
 
         return Response({
             'message': f'Profile update request {action}',

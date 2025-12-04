@@ -663,6 +663,12 @@ class RegularizationApplyView(APIView):
         # Notify admins about new regularization request
         notify_regularization_applied(regularization)
 
+        # Log activity
+        try:
+            log_regularization_applied(request.user, regularization, request)
+        except Exception:
+            pass
+
         return Response({
             "message": "Regularization request submitted successfully",
             "data": RegularizationRequestSerializer(regularization).data
@@ -780,6 +786,12 @@ class RegularizationReviewView(APIView):
         # Notify employee about regularization status (with email)
         notify_regularization_status(regularization, new_status, review_remarks)
 
+        # Log activity
+        try:
+            log_regularization_reviewed(request.user, regularization, new_status, request)
+        except Exception:
+            pass
+
         return Response({
             "message": f"Regularization request {new_status}",
             "data": RegularizationRequestSerializer(regularization).data
@@ -863,6 +875,12 @@ class WFHApplyView(APIView):
         # Notify admins about new WFH request
         notify_wfh_applied(wfh_request)
 
+        # Log activity
+        try:
+            log_wfh_applied(request.user, wfh_request, request)
+        except Exception:
+            pass
+
         return Response({
             "message": "WFH request submitted successfully",
             "data": WFHRequestSerializer(wfh_request).data
@@ -930,6 +948,12 @@ class WFHReviewView(APIView):
 
         # Notify employee about WFH status
         notify_wfh_status(wfh_request, new_status, review_remarks)
+
+        # Log activity
+        try:
+            log_wfh_reviewed(request.user, wfh_request, new_status, request)
+        except Exception:
+            pass
 
         return Response({
             "message": f"WFH request {new_status}",
@@ -1324,6 +1348,14 @@ class ShiftListCreateView(generics.ListCreateAPIView):
         if self.request.method == 'POST':
             return ShiftCreateSerializer
         return ShiftSerializer
+
+    def perform_create(self, serializer):
+        shift = serializer.save()
+        # Log activity
+        try:
+            log_shift_created(self.request.user, shift, self.request)
+        except Exception:
+            pass
 
 
 class ShiftDetailView(generics.RetrieveUpdateDestroyAPIView):

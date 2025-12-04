@@ -991,6 +991,11 @@ class HolidayListView(generics.ListCreateAPIView):
         holiday = serializer.save()
         # Send notification to all employees
         notify_all_employees_holiday(holiday)
+        # Log activity
+        try:
+            log_holiday_added(self.request.user, holiday, self.request)
+        except Exception:
+            pass
 
 
 class HolidayDetailView(generics.RetrieveUpdateDestroyAPIView):
