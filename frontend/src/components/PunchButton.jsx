@@ -154,8 +154,8 @@ const PunchButton = ({ type, onSuccess, disabled, todayAttendance }) => {
   const handleCancelLeaveAndPunch = async () => {
     setLoading(true);
     try {
-      // Cancel leave for today
-      const today = new Date().toISOString().split('T')[0];
+      // Cancel leave for today (use IST timezone)
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Returns YYYY-MM-DD format
       await leaveAPI.cancelLeaveForDate({ date: today, leave_id: leaveInfo.leave_id });
       toast.success('Leave cancelled for today');
 
