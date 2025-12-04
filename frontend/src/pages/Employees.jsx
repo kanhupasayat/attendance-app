@@ -1,8 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import Avatar from '@mui/material/Avatar';
 import { authAPI } from '../services/api';
 import Layout from '../components/Layout';
+
+// Function to generate consistent color based on name
+const stringToColor = (string) => {
+  let hash = 0;
+  for (let i = 0; i < string.length; i++) {
+    hash = string.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xff;
+    color += `00${value.toString(16)}`.slice(-2);
+  }
+  return color;
+};
 
 const Employees = () => {
   const navigate = useNavigate();
@@ -145,14 +160,30 @@ const Employees = () => {
                 {employees.map((employee) => (
                   <div key={employee.id} className="bg-gray-50 rounded-lg p-3 sm:p-4 border">
                     <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p
-                          className="font-medium text-blue-600 text-sm cursor-pointer hover:underline"
+                      <div className="flex items-center gap-3">
+                        <Avatar
+                          src={employee.photo}
+                          alt={employee.name}
+                          sx={{
+                            width: 44,
+                            height: 44,
+                            bgcolor: stringToColor(employee.name || 'U'),
+                            fontSize: '1rem',
+                            cursor: 'pointer'
+                          }}
                           onClick={() => handleViewProfile(employee)}
                         >
-                          {employee.name}
-                        </p>
-                        <p className="text-gray-600 text-xs">{employee.mobile}</p>
+                          {employee.name?.charAt(0)?.toUpperCase()}
+                        </Avatar>
+                        <div>
+                          <p
+                            className="font-medium text-blue-600 text-sm cursor-pointer hover:underline"
+                            onClick={() => handleViewProfile(employee)}
+                          >
+                            {employee.name}
+                          </p>
+                          <p className="text-gray-600 text-xs">{employee.mobile}</p>
+                        </div>
                       </div>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         employee.is_active
@@ -241,11 +272,27 @@ const Employees = () => {
                     {employees.map((employee) => (
                       <tr key={employee.id} className="hover:bg-gray-50">
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div
-                            className="text-sm font-medium text-blue-600 cursor-pointer hover:underline"
-                            onClick={() => handleViewProfile(employee)}
-                          >
-                            {employee.name}
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              src={employee.photo}
+                              alt={employee.name}
+                              sx={{
+                                width: 40,
+                                height: 40,
+                                bgcolor: stringToColor(employee.name || 'U'),
+                                fontSize: '0.9rem',
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => handleViewProfile(employee)}
+                            >
+                              {employee.name?.charAt(0)?.toUpperCase()}
+                            </Avatar>
+                            <div
+                              className="text-sm font-medium text-blue-600 cursor-pointer hover:underline"
+                              onClick={() => handleViewProfile(employee)}
+                            >
+                              {employee.name}
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
