@@ -13,7 +13,7 @@ from .serializers import (
     ProfileUpdateRequestSerializer, ProfileUpdateRequestCreateSerializer,
     ActivityLogSerializer
 )
-from .utils import notify_profile_update_applied, notify_profile_update_status
+from .utils import notify_profile_update_applied, notify_profile_update_status, send_email_async
 from .email_utils import send_otp_email
 from .activity_utils import (
     log_activity, log_employee_added, log_employee_updated, log_employee_deactivated,
@@ -86,14 +86,13 @@ class OTPRequestView(APIView):
                 expires_at=timezone.now() + timezone.timedelta(minutes=10)
             )
 
-            # Send OTP via email
-            email_sent = False
+            # Send OTP via email (async - non-blocking)
             if user.email:
-                email_sent = send_otp_email(user, otp.otp)
+                send_email_async(send_otp_email, user, otp.otp)
 
             return Response({
                 "message": "OTP sent successfully",
-                "email_sent": email_sent,
+                "otp": otp.otp,  # For development - remove in production
                 "email_hint": user.email[:3] + "***" + user.email[user.email.index('@'):] if user.email else None
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
