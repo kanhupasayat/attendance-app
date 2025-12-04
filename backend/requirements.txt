@@ -11,6 +11,9 @@ tzdata==2025.2
 cloudinary==1.44.1
 django-cloudinary-storage==0.3.0
 pillow==11.0.0
+# Export functionality
+openpyxl==3.1.2
+reportlab==4.0.7
 # Production dependencies
 gunicorn==21.2.0
 dj-database-url==2.1.0

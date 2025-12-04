@@ -560,6 +560,154 @@ class ExportAttendanceCSVView(APIView):
         return response
 
 
+class ExportAttendanceExcelView(APIView):
+    """Export attendance data to Excel format"""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from io import BytesIO
+
+        month = int(request.query_params.get('month', timezone.now().month))
+        year = int(request.query_params.get('year', timezone.now().year))
+
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"Attendance {year}-{month:02d}"
+
+        # Styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        # Headers
+        headers = ['Employee Name', 'Date', 'Punch In', 'Punch Out', 'Working Hours', 'Status']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+        # Data
+        attendances = Attendance.objects.filter(
+            date__month=month, date__year=year
+        ).select_related('user').order_by('user__name', 'date')
+
+        for row, att in enumerate(attendances, 2):
+            ws.cell(row=row, column=1, value=att.user.name).border = thin_border
+            ws.cell(row=row, column=2, value=str(att.date)).border = thin_border
+            ws.cell(row=row, column=3, value=att.punch_in.strftime('%I:%M %p') if att.punch_in else '-').border = thin_border
+            ws.cell(row=row, column=4, value=att.punch_out.strftime('%I:%M %p') if att.punch_out else '-').border = thin_border
+            ws.cell(row=row, column=5, value=float(att.working_hours) if att.working_hours else 0).border = thin_border
+            ws.cell(row=row, column=6, value=att.status.upper()).border = thin_border
+
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 12
+        ws.column_dimensions['D'].width = 12
+        ws.column_dimensions['E'].width = 15
+        ws.column_dimensions['F'].width = 12
+
+        # Save to response
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="attendance_{year}_{month:02d}.xlsx"'
+        return response
+
+
+class ExportAttendancePDFView(APIView):
+    """Export attendance data to PDF format"""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from io import BytesIO
+
+        month = int(request.query_params.get('month', timezone.now().month))
+        year = int(request.query_params.get('year', timezone.now().year))
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=30, bottomMargin=30)
+        elements = []
+
+        # Styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            alignment=1,
+            spaceAfter=20
+        )
+
+        # Title
+        month_name = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'][month - 1]
+        title = Paragraph(f"Attendance Report - {month_name} {year}", title_style)
+        elements.append(title)
+        elements.append(Spacer(1, 20))
+
+        # Data
+        attendances = Attendance.objects.filter(
+            date__month=month, date__year=year
+        ).select_related('user').order_by('user__name', 'date')
+
+        data = [['Employee', 'Date', 'Punch In', 'Punch Out', 'Hours', 'Status']]
+        for att in attendances:
+            data.append([
+                att.user.name,
+                str(att.date),
+                att.punch_in.strftime('%I:%M %p') if att.punch_in else '-',
+                att.punch_out.strftime('%I:%M %p') if att.punch_out else '-',
+                str(att.working_hours) if att.working_hours else '0',
+                att.status.upper()
+            ])
+
+        if len(data) > 1:
+            table = Table(data, colWidths=[120, 80, 80, 80, 60, 80])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F2F2F2')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F2F2F2')]),
+            ]))
+            elements.append(table)
+        else:
+            elements.append(Paragraph("No attendance records found for this period.", styles['Normal']))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="attendance_{year}_{month:02d}.pdf"'
+        return response
+
+
 class OfficeLocationListView(generics.ListCreateAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = OfficeLocationSerializer

@@ -14,6 +14,9 @@ const Attendance = () => {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
 
+  // Export states
+  const [exporting, setExporting] = useState(false);
+
   // Admin modal states
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
@@ -63,6 +66,51 @@ const Attendance = () => {
     fetchAttendance();
     fetchEmployees();
   }, [month, year, isAdmin]);
+
+  // Export functions
+  const handleExport = async (format) => {
+    if (!isAdmin) return;
+    setExporting(true);
+    try {
+      let response;
+      let filename;
+      const params = { month, year };
+
+      switch (format) {
+        case 'csv':
+          response = await attendanceAPI.exportCSV(params);
+          filename = `attendance_${year}_${month}.csv`;
+          break;
+        case 'excel':
+          response = await attendanceAPI.exportExcel(params);
+          filename = `attendance_${year}_${month}.xlsx`;
+          break;
+        case 'pdf':
+          response = await attendanceAPI.exportPDF(params);
+          filename = `attendance_${year}_${month}.pdf`;
+          break;
+        default:
+          return;
+      }
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success(`Report exported as ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export report');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-IN', {
@@ -230,7 +278,7 @@ const Attendance = () => {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-2 sm:gap-4">
+            <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
               <select
                 value={month}
                 onChange={(e) => setMonth(Number(e.target.value))}
@@ -249,6 +297,50 @@ const Attendance = () => {
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
+
+              {/* Export Buttons (Admin Only) */}
+              {isAdmin && (
+                <div className="flex gap-2 ml-auto">
+                  <div className="relative group">
+                    <button
+                      onClick={() => {}}
+                      disabled={exporting}
+                      className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      {exporting ? 'Exporting...' : 'Export'}
+                    </button>
+                    <div className="absolute right-0 mt-1 w-36 bg-white rounded-lg shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                      <button
+                        onClick={() => handleExport('csv')}
+                        disabled={exporting}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 rounded-t-lg flex items-center gap-2"
+                      >
+                        <span className="text-green-600">CSV</span>
+                        <span className="text-gray-400 text-xs">(.csv)</span>
+                      </button>
+                      <button
+                        onClick={() => handleExport('excel')}
+                        disabled={exporting}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <span className="text-green-600">Excel</span>
+                        <span className="text-gray-400 text-xs">(.xlsx)</span>
+                      </button>
+                      <button
+                        onClick={() => handleExport('pdf')}
+                        disabled={exporting}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 rounded-b-lg flex items-center gap-2"
+                      >
+                        <span className="text-red-600">PDF</span>
+                        <span className="text-gray-400 text-xs">(.pdf)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

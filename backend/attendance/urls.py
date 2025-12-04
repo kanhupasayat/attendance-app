@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     PunchInView, PunchOutView, TodayAttendanceView, MyAttendanceListView,
     AllAttendanceListView, AttendanceReportView, ExportAttendanceCSVView,
+    ExportAttendanceExcelView, ExportAttendancePDFView,
     OfficeLocationListView, OfficeLocationDetailView, OffDayWorkStatsView,
     RegularizationApplyView, MyRegularizationListView, AllRegularizationListView,
     RegularizationReviewView, CancelRegularizationView,
@@ -31,6 +32,8 @@ urlpatterns = [
     path('all/', AllAttendanceListView.as_view(), name='all-attendance'),
     path('report/', AttendanceReportView.as_view(), name='attendance-report'),
     path('export/', ExportAttendanceCSVView.as_view(), name='export-attendance'),
+    path('export/excel/', ExportAttendanceExcelView.as_view(), name='export-attendance-excel'),
+    path('export/pdf/', ExportAttendancePDFView.as_view(), name='export-attendance-pdf'),
     path('regularization/all/', AllRegularizationListView.as_view(), name='all-regularizations'),
     path('regularization/review/<int:pk>/', RegularizationReviewView.as_view(), name='review-regularization'),
 
