@@ -413,6 +413,7 @@ class ClearNotificationsView(APIView):
 class ActivityLogListView(generics.ListAPIView):
     """Get activity logs - Admin sees all, Employee sees their own"""
     serializer_class = ActivityLogSerializer
+    pagination_class = None  # Disable pagination for timeline
 
     def get_queryset(self):
         user = self.request.user
