@@ -355,35 +355,44 @@ class ActivityLogSerializer(serializers.ModelSerializer):
         return obj.actor.name if obj.actor else 'System'
 
     def get_actor_photo(self, obj):
-        if obj.actor and obj.actor.photo:
-            return obj.actor.photo.url
+        try:
+            if obj.actor and obj.actor.photo:
+                return obj.actor.photo.url
+        except Exception:
+            pass
         return None
 
     def get_target_user_name(self, obj):
         return obj.target_user.name if obj.target_user else None
 
     def get_time_ago(self, obj):
-        from django.utils import timezone
-        now = timezone.now()
-        diff = now - obj.created_at
+        try:
+            from django.utils import timezone
+            now = timezone.now()
+            diff = now - obj.created_at
 
-        seconds = diff.total_seconds()
-        if seconds < 60:
-            return 'Just now'
-        elif seconds < 3600:
-            minutes = int(seconds / 60)
-            return f'{minutes}m ago'
-        elif seconds < 86400:
-            hours = int(seconds / 3600)
-            return f'{hours}h ago'
-        elif seconds < 604800:
-            days = int(seconds / 86400)
-            return f'{days}d ago'
-        else:
-            return obj.created_at.strftime('%d %b')
+            seconds = diff.total_seconds()
+            if seconds < 60:
+                return 'Just now'
+            elif seconds < 3600:
+                minutes = int(seconds / 60)
+                return f'{minutes}m ago'
+            elif seconds < 86400:
+                hours = int(seconds / 3600)
+                return f'{hours}h ago'
+            elif seconds < 604800:
+                days = int(seconds / 86400)
+                return f'{days}d ago'
+            else:
+                return obj.created_at.strftime('%d %b')
+        except Exception:
+            return ''
 
     def get_formatted_time(self, obj):
-        import pytz
-        ist = pytz.timezone('Asia/Kolkata')
-        local_time = obj.created_at.astimezone(ist)
-        return local_time.strftime('%I:%M %p')
+        try:
+            import pytz
+            ist = pytz.timezone('Asia/Kolkata')
+            local_time = obj.created_at.astimezone(ist)
+            return local_time.strftime('%I:%M %p')
+        except Exception:
+            return ''
