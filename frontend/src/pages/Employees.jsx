@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Avatar from '@mui/material/Avatar';
+import Skeleton from '@mui/material/Skeleton';
 import { authAPI } from '../services/api';
 import Layout from '../components/Layout';
 
@@ -150,9 +151,93 @@ const Employees = () => {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
+            <>
+              {/* Mobile Skeleton */}
+              <div className="block lg:hidden space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="bg-gray-50 rounded-lg p-3 sm:p-4 border">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-3">
+                        <Skeleton variant="circular" width={44} height={44} />
+                        <div>
+                          <Skeleton variant="text" width={100} height={20} />
+                          <Skeleton variant="text" width={80} height={16} />
+                        </div>
+                      </div>
+                      <Skeleton variant="rounded" width={60} height={24} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {[1, 2, 3, 4].map((j) => (
+                        <div key={j}>
+                          <Skeleton variant="text" width={70} height={14} />
+                          <Skeleton variant="text" width={90} height={18} />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Skeleton variant="rounded" width="100%" height={32} />
+                      <Skeleton variant="rounded" width="100%" height={32} />
+                      <Skeleton variant="rounded" width="100%" height={32} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table Skeleton */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Designation</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Weekly Off</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <Skeleton variant="circular" width={40} height={40} />
+                            <Skeleton variant="text" width={100} height={20} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={90} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={140} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={80} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={80} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={60} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="rounded" width={60} height={24} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex gap-3">
+                            <Skeleton variant="text" width={35} height={20} />
+                            <Skeleton variant="text" width={30} height={20} />
+                            <Skeleton variant="text" width={40} height={20} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : employees.length > 0 ? (
             <>
               {/* Mobile Card View */}

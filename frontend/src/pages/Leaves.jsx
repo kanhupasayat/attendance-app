@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import Skeleton from '@mui/material/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { leaveAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -200,9 +201,105 @@ const Leaves = () => {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
+            <>
+              {/* Mobile Skeleton */}
+              <div className="block lg:hidden space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="bg-gray-50 rounded-lg p-3 sm:p-4 border">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        {isAdmin && <Skeleton variant="text" width={100} height={20} />}
+                        <Skeleton variant="text" width={60} height={18} />
+                      </div>
+                      <Skeleton variant="rounded" width={70} height={24} />
+                    </div>
+                    <div className="mb-2">
+                      <Skeleton variant="text" width={150} height={16} />
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-2">
+                      {[1, 2, 3, 4].map((j) => (
+                        <div key={j} className="text-center bg-white rounded p-1.5 border">
+                          <Skeleton variant="text" width="80%" height={14} sx={{ margin: '0 auto' }} />
+                          <Skeleton variant="text" width="60%" height={18} sx={{ margin: '0 auto' }} />
+                        </div>
+                      ))}
+                    </div>
+                    <Skeleton variant="text" width="100%" height={16} sx={{ mb: 1 }} />
+                    <div className="flex gap-2">
+                      <Skeleton variant="rounded" width="100%" height={32} />
+                      <Skeleton variant="rounded" width="100%" height={32} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table Skeleton */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {isAdmin && (
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                      )}
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">To</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CompOff</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">LOP</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <tr key={i}>
+                        {isAdmin && (
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <Skeleton variant="text" width={100} height={20} />
+                          </td>
+                        )}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={40} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={90} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={90} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={30} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={25} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={25} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="text" width={25} height={20} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <Skeleton variant="text" width={120} height={20} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <Skeleton variant="rounded" width={70} height={24} />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex gap-2">
+                            <Skeleton variant="text" width={50} height={20} />
+                            <Skeleton variant="text" width={40} height={20} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : requests.length > 0 ? (
             <>
               {/* Mobile Card View */}

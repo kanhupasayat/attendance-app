@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import Skeleton from '@mui/material/Skeleton';
 import { useAuth } from '../context/AuthContext';
 import { attendanceAPI, leaveAPI, authAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -89,12 +90,54 @@ const Dashboard = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex flex-col justify-center items-center h-64 gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
-            <div className="w-16 h-16 border-4 border-blue-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+        <div className="space-y-5 sm:space-y-6">
+          {/* Welcome Section Skeleton */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <Skeleton variant="rounded" width={56} height={56} />
+                <div>
+                  <Skeleton variant="text" width={200} height={32} />
+                  <Skeleton variant="text" width={150} height={20} />
+                </div>
+              </div>
+              <Skeleton variant="text" width={180} height={24} />
+            </div>
           </div>
-          <p className="text-gray-500 font-medium">Loading dashboard...</p>
+
+          {/* Punch Section Skeleton */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-2">
+                <Skeleton variant="text" width={120} height={28} />
+                <div className="flex gap-6">
+                  <Skeleton variant="text" width={100} height={20} />
+                  <Skeleton variant="text" width={100} height={20} />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Skeleton variant="rounded" width={130} height={56} sx={{ borderRadius: '12px' }} />
+                <Skeleton variant="rounded" width={130} height={56} sx={{ borderRadius: '12px' }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Cards Skeleton */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <Skeleton variant="circular" width={40} height={40} sx={{ mb: 1 }} />
+                <Skeleton variant="text" width={60} height={36} />
+                <Skeleton variant="text" width={80} height={16} />
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Skeleton */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <Skeleton variant="text" width={200} height={28} sx={{ mb: 2 }} />
+            <Skeleton variant="rounded" width="100%" height={300} sx={{ borderRadius: '12px' }} />
+          </div>
         </div>
       </Layout>
     );
