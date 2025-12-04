@@ -24,7 +24,7 @@ const Attendance = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     user_id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
     punch_in: '',
     punch_out: '',
     status: 'present',
@@ -155,7 +155,7 @@ const Attendance = () => {
     await fetchEmployees();
     setFormData({
       user_id: '',
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
       punch_in: '',
       punch_out: '',
       status: 'present',

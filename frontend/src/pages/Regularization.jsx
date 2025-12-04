@@ -177,7 +177,7 @@ const Regularization = () => {
     return found ? found.label : type;
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
   return (
     <Layout>
