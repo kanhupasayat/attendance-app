@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Badge from '@mui/material/Badge';
 import { authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -111,16 +112,21 @@ const NotificationBell = () => {
       case 'leave_approved':
       case 'regularization_approved':
       case 'profile_update_approved':
+      case 'wfh_approved':
         return '✓';
       case 'leave_rejected':
       case 'regularization_rejected':
       case 'profile_update_rejected':
+      case 'wfh_rejected':
         return '✗';
       case 'leave_applied':
       case 'regularization_applied':
+      case 'wfh_applied':
         return '📝';
       case 'profile_update_requested':
         return '👤';
+      case 'holiday':
+        return '🎉';
       default:
         return '🔔';
     }
@@ -130,13 +136,23 @@ const NotificationBell = () => {
     if (type.includes('approved')) return 'text-green-600';
     if (type.includes('rejected')) return 'text-red-600';
     if (type.includes('profile_update_requested')) return 'text-purple-600';
+    if (type === 'holiday') return 'text-orange-600';
+    if (type.includes('wfh')) return 'text-indigo-600';
     return 'text-blue-600';
   };
 
   // Get the route to navigate based on notification type
   const getNotificationRoute = (type) => {
+    // Leave related
     if (type.includes('leave')) return '/leaves';
+
+    // Regularization related
     if (type.includes('regularization')) return '/regularization';
+
+    // WFH (Work From Home) related
+    if (type.includes('wfh')) return '/regularization'; // WFH is in regularization page
+
+    // Profile update related
     if (type.includes('profile_update')) {
       // Admin goes to profile requests page, employee goes to profile page
       if (type === 'profile_update_requested') {
@@ -145,6 +161,13 @@ const NotificationBell = () => {
       // For approved/rejected notifications, employee goes to profile
       return '/profile';
     }
+
+    // Holiday notification
+    if (type === 'holiday') return '/leaves'; // Holidays shown in leaves page
+
+    // System notification - go to dashboard
+    if (type === 'system') return '/';
+
     return null;
   };
 
@@ -169,24 +192,33 @@ const NotificationBell = () => {
         onClick={() => setShowDropdown(!showDropdown)}
         className="relative p-2 text-white hover:text-blue-200 focus:outline-none"
       >
-        <svg
-          className="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+        <Badge
+          badgeContent={unreadCount}
+          color="error"
+          max={99}
+          sx={{
+            '& .MuiBadge-badge': {
+              fontSize: '0.65rem',
+              minWidth: '18px',
+              height: '18px',
+              padding: '0 4px',
+            }
+          }}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
-        </svg>
-        {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+            />
+          </svg>
+        </Badge>
       </button>
 
       {showDropdown && (
