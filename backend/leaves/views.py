@@ -244,12 +244,13 @@ class LeaveApplyView(APIView):
     """
     Smart Leave System:
     1. First use available Comp Off
-    2. Then use available Leave balance (minus pending requests)
+    2. Then use available Leave balance (minus pending requests AND absences)
     3. Remaining days become LOP
     """
     def post(self, request):
-        from attendance.models import CompOff
+        from attendance.models import CompOff, Attendance
         from django.db.models import Sum
+        from datetime import date, timedelta
 
         serializer = LeaveApplySerializer(data=request.data)
         if not serializer.is_valid():
@@ -346,11 +347,82 @@ class LeaveApplyView(APIView):
             start_date__month=month
         ).aggregate(total=Sum('paid_days'))['total'] or 0
 
+        # IMPORTANT: Also calculate absences that have consumed leave balance
+        # This is needed because absences use sick leave automatically (real-time LOP)
+        absent_days_consuming_leave = 0
+        if leave_type.code == 'SL':
+            # Get user's weekly off day
+            user_weekly_off = request.user.weekly_off if request.user.weekly_off is not None else 6
+
+            # Get attendance records for this month
+            attendance_records = {
+                record['date']: record['status']
+                for record in Attendance.objects.filter(
+                    user=request.user,
+                    date__year=year,
+                    date__month=month
+                ).values('date', 'status')
+            }
+
+            # Get approved leave dates for this month
+            leave_dates = set()
+            approved_leaves = LeaveRequest.objects.filter(
+                user=request.user,
+                status='approved',
+                start_date__lte=date(year, month, 28),
+                end_date__gte=date(year, month, 1)
+            )
+            for leave in approved_leaves:
+                current = max(leave.start_date, date(year, month, 1))
+                end = min(leave.end_date, date(year, month, 28))
+                while current <= end:
+                    if current.month == month:
+                        leave_dates.add(current)
+                    current += timedelta(days=1)
+
+            # Get holidays
+            holidays = set(
+                Holiday.objects.filter(
+                    date__year=year,
+                    date__month=month
+                ).values_list('date', flat=True)
+            )
+
+            # Count absent days (days with no attendance or status='absent')
+            today = timezone.now().date()
+            days_in_month = (date(year, month + 1, 1) - timedelta(days=1)).day if month < 12 else 31
+            last_day = min(days_in_month, today.day) if year == today.year and month == today.month else days_in_month
+
+            absent_days = 0
+            for day in range(1, last_day + 1):
+                current_date = date(year, month, day)
+                day_of_week = current_date.weekday()
+
+                # Skip weekly off
+                if day_of_week == user_weekly_off:
+                    continue
+                # Skip holidays
+                if current_date in holidays:
+                    continue
+                # Skip approved leave dates
+                if current_date in leave_dates:
+                    continue
+
+                # Count as absent if no record or status='absent'
+                if current_date not in attendance_records:
+                    absent_days += 1
+                elif attendance_records.get(current_date) == 'absent':
+                    absent_days += 1
+
+            # Calculate how many absences have consumed sick leave
+            # Available SL before absences = total + carried_forward - already_used_from_requests
+            available_before_absences = float(balance.total_leaves) + float(balance.carried_forward) - float(already_used_paid_days)
+            absent_days_consuming_leave = min(absent_days, max(0, available_before_absences))
+
         # Calculate paid days from leave balance
-        # available_leaves from balance already subtracts used_leaves
-        # But we need to also subtract pending requests that haven't updated balance yet
+        # available_leaves = total + carried_forward - used_from_requests - used_by_absences
         total_quota = float(balance.total_leaves) + float(balance.carried_forward)
-        available_leaves = total_quota - float(already_used_paid_days)
+        available_leaves = total_quota - float(already_used_paid_days) - absent_days_consuming_leave
         available_leaves = max(0, available_leaves)
         paid_days = min(remaining_days, available_leaves)
         remaining_days -= paid_days
