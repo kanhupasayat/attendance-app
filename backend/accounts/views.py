@@ -415,9 +415,18 @@ class ActivityLogListView(generics.ListAPIView):
     serializer_class = ActivityLogSerializer
     pagination_class = None  # Disable pagination for timeline
 
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            import logging
+            logging.error(f"ActivityLog error: {str(e)}")
+            return Response([])
+
     def get_queryset(self):
         user = self.request.user
-        queryset = ActivityLog.objects.all()
+        # Use select_related to avoid N+1 queries
+        queryset = ActivityLog.objects.select_related('actor', 'target_user').all()
 
         # If not admin, only show their own activities
         if not user.is_admin:
@@ -441,7 +450,8 @@ class ActivityLogListView(generics.ListAPIView):
         if actor_id and user.is_admin:
             queryset = queryset.filter(actor_id=actor_id)
 
-        return queryset[:100]  # Limit to last 100 activities
+        # Limit to 100 most recent activities
+        return queryset.order_by('-created_at')[:100]
 
 
 # Profile Update Request Views
