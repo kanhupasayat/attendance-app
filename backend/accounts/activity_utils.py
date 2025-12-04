@@ -292,3 +292,112 @@ def log_profile_update_reviewed(reviewer, profile_request, status, request=None)
         related_id=profile_request.id,
         request=request
     )
+
+
+def log_shift_updated(admin, shift, request=None):
+    """Log shift updated"""
+    return log_activity(
+        actor=admin,
+        activity_type='shift_updated',
+        category='shift',
+        title=f'Admin updated shift: {shift.name}',
+        description=f'{shift.start_time.strftime("%I:%M %p")} - {shift.end_time.strftime("%I:%M %p")}',
+        related_model='Shift',
+        related_id=shift.id,
+        request=request
+    )
+
+
+def log_shift_deleted(admin, shift_name, request=None):
+    """Log shift deleted"""
+    return log_activity(
+        actor=admin,
+        activity_type='shift_deleted',
+        category='shift',
+        title=f'Admin deleted shift: {shift_name}',
+        description='',
+        request=request
+    )
+
+
+def log_holiday_updated(admin, holiday, request=None):
+    """Log holiday updated"""
+    return log_activity(
+        actor=admin,
+        activity_type='holiday_updated',
+        category='holiday',
+        title=f'Admin updated holiday: {holiday.name}',
+        description=f'Date: {holiday.date}',
+        related_model='Holiday',
+        related_id=holiday.id,
+        request=request
+    )
+
+
+def log_holiday_deleted(admin, holiday_name, holiday_date, request=None):
+    """Log holiday deleted"""
+    return log_activity(
+        actor=admin,
+        activity_type='holiday_deleted',
+        category='holiday',
+        title=f'Admin deleted holiday: {holiday_name}',
+        description=f'Date: {holiday_date}',
+        request=request
+    )
+
+
+def log_leave_cancelled(user, leave_request, request=None):
+    """Log leave cancellation"""
+    return log_activity(
+        actor=user,
+        activity_type='leave_cancelled',
+        category='leave',
+        title=f'{user.name} cancelled leave request',
+        description=f'{leave_request.leave_type.name}: {leave_request.start_date} to {leave_request.end_date}',
+        related_model='LeaveRequest',
+        related_id=leave_request.id,
+        request=request
+    )
+
+
+def log_leave_type_created(admin, leave_type, request=None):
+    """Log leave type created"""
+    return log_activity(
+        actor=admin,
+        activity_type='leave_type_created',
+        category='leave_type',
+        title=f'Admin created leave type: {leave_type.name}',
+        description=f'Default days: {leave_type.default_days}',
+        related_model='LeaveType',
+        related_id=leave_type.id,
+        request=request
+    )
+
+
+def log_leave_type_updated(admin, leave_type, request=None):
+    """Log leave type updated"""
+    return log_activity(
+        actor=admin,
+        activity_type='leave_type_updated',
+        category='leave_type',
+        title=f'Admin updated leave type: {leave_type.name}',
+        description=f'Default days: {leave_type.default_days}',
+        related_model='LeaveType',
+        related_id=leave_type.id,
+        request=request
+    )
+
+
+def log_employee_deactivated(admin, employee, request=None):
+    """Log employee deactivated"""
+    return log_activity(
+        actor=admin,
+        target_user=employee,
+        activity_type='employee_deactivated',
+        category='employee',
+        title=f'Admin deactivated employee: {employee.name}',
+        description=f'Department: {employee.department}',
+        related_model='User',
+        related_id=employee.id,
+        request=request
+    )

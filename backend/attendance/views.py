@@ -33,7 +33,8 @@ from accounts.utils import (
 from accounts.activity_utils import (
     log_punch_in, log_punch_out, log_regularization_applied,
     log_regularization_reviewed, log_attendance_edit, log_wfh_applied,
-    log_wfh_reviewed, log_shift_created, log_holiday_added
+    log_wfh_reviewed, log_shift_created, log_shift_updated, log_shift_deleted,
+    log_holiday_added, log_holiday_updated, log_holiday_deleted
 )
 
 
@@ -1322,6 +1323,13 @@ class AdminAttendanceUpdateView(APIView):
 
         attendance.save(force_status=force_status)
 
+        # Log activity
+        try:
+            changes = {k: v for k, v in request.data.items() if k != 'notes'}
+            log_attendance_edit(request.user, attendance, changes, request)
+        except Exception:
+            pass
+
         return Response({
             "message": "Attendance updated successfully",
             "data": AttendanceSerializer(attendance).data
@@ -1511,6 +1519,21 @@ class ShiftDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = ShiftSerializer
     queryset = Shift.objects.all()
+
+    def perform_update(self, serializer):
+        shift = serializer.save()
+        try:
+            log_shift_updated(self.request.user, shift, self.request)
+        except Exception:
+            pass
+
+    def perform_destroy(self, instance):
+        shift_name = instance.name
+        instance.delete()
+        try:
+            log_shift_deleted(self.request.user, shift_name, self.request)
+        except Exception:
+            pass
 
 
 class AssignShiftView(APIView):

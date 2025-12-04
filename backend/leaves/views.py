@@ -20,7 +20,11 @@ from .serializers import (
 )
 from accounts.views import IsAdminUser
 from accounts.utils import notify_leave_applied, notify_leave_status
-from accounts.activity_utils import log_leave_applied, log_leave_reviewed, log_holiday_added
+from accounts.activity_utils import (
+    log_leave_applied, log_leave_reviewed, log_leave_cancelled,
+    log_holiday_added, log_holiday_updated, log_holiday_deleted,
+    log_leave_type_created, log_leave_type_updated
+)
 
 
 class LeaveTypeListView(generics.ListCreateAPIView):
@@ -34,11 +38,25 @@ class LeaveTypeListView(generics.ListCreateAPIView):
             return [IsAdminUser()]
         return [permissions.IsAuthenticated()]
 
+    def perform_create(self, serializer):
+        leave_type = serializer.save()
+        try:
+            log_leave_type_created(self.request.user, leave_type, self.request)
+        except Exception:
+            pass
+
 
 class LeaveTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = LeaveTypeSerializer
     queryset = LeaveType.objects.all()
+
+    def perform_update(self, serializer):
+        leave_type = serializer.save()
+        try:
+            log_leave_type_updated(self.request.user, leave_type, self.request)
+        except Exception:
+            pass
 
 
 class MyLeaveBalanceView(APIView):
@@ -510,6 +528,12 @@ class CancelLeaveRequestView(APIView):
 
         leave_request.status = 'cancelled'
         leave_request.save()
+
+        # Log activity
+        try:
+            log_leave_cancelled(request.user, leave_request, request)
+        except Exception:
+            pass
 
         return Response({"message": "Leave request cancelled"})
 
@@ -1002,6 +1026,22 @@ class HolidayDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = HolidaySerializer
     queryset = Holiday.objects.all()
+
+    def perform_update(self, serializer):
+        holiday = serializer.save()
+        try:
+            log_holiday_updated(self.request.user, holiday, self.request)
+        except Exception:
+            pass
+
+    def perform_destroy(self, instance):
+        holiday_name = instance.name
+        holiday_date = str(instance.date)
+        instance.delete()
+        try:
+            log_holiday_deleted(self.request.user, holiday_name, holiday_date, self.request)
+        except Exception:
+            pass
 
 
 class CheckTodayLeaveView(APIView):

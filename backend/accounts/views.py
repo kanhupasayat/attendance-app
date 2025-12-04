@@ -15,7 +15,7 @@ from .serializers import (
 )
 from .utils import notify_profile_update_applied, notify_profile_update_status
 from .activity_utils import (
-    log_activity, log_employee_added, log_employee_updated,
+    log_activity, log_employee_added, log_employee_updated, log_employee_deactivated,
     log_profile_update_requested, log_profile_update_reviewed
 )
 
@@ -193,6 +193,7 @@ class EmployeeDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance = self.get_object()
         # Track changed fields
         old_data = {field: getattr(instance, field) for field in ['name', 'email', 'department', 'designation', 'mobile', 'shift_id', 'weekly_off', 'is_active']}
+        was_active = old_data.get('is_active', True)
 
         response = super().update(request, *args, **kwargs)
 
@@ -202,11 +203,23 @@ class EmployeeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         if changed_fields:
             try:
-                log_employee_updated(request.user, instance, changed_fields, request)
+                # Check if employee was deactivated
+                if was_active and not instance.is_active:
+                    log_employee_deactivated(request.user, instance, request)
+                else:
+                    log_employee_updated(request.user, instance, changed_fields, request)
             except Exception:
                 pass
 
         return response
+
+    def perform_destroy(self, instance):
+        employee_name = instance.name
+        try:
+            log_employee_deactivated(self.request.user, instance, self.request)
+        except Exception:
+            pass
+        instance.delete()
 
 
 class CheckAdminExistsView(APIView):
