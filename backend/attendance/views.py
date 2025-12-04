@@ -735,7 +735,7 @@ class RegularizationReviewView(APIView):
             # Always set status to present when regularization is approved
             attendance.status = 'present'
             attendance.notes = f"Regularized: {regularization.request_type}"
-            attendance.save()
+            attendance.save(force_status=True)  # Prevent auto-status calculation
 
         # Notify employee about regularization status (with email)
         notify_regularization_status(regularization, new_status, review_remarks)
@@ -1097,15 +1097,18 @@ class AdminAttendanceUpdateView(APIView):
             else:
                 attendance.punch_out = None
 
+        # Check if admin is explicitly setting status
+        force_status = False
         if 'status' in serializer.validated_data:
             attendance.status = serializer.validated_data['status']
+            force_status = True  # Preserve admin's status choice
 
         if 'notes' in serializer.validated_data:
             existing_notes = attendance.notes or ''
             new_note = serializer.validated_data['notes']
             attendance.notes = f"{existing_notes}\n[Admin update]: {new_note}".strip()
 
-        attendance.save()
+        attendance.save(force_status=force_status)
 
         return Response({
             "message": "Attendance updated successfully",

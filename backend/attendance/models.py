@@ -296,10 +296,13 @@ class Attendance(models.Model):
         return False
 
     def save(self, *args, **kwargs):
+        # Check if status should be preserved (for regularization, admin edits, etc.)
+        force_status = kwargs.pop('force_status', False)
+
         if self.punch_in and self.punch_out:
             self.calculate_working_hours()
-            # Only auto-set status if it's currently 'present'
-            if self.status == 'present':
+            # Only auto-set status if not forced AND currently 'present'
+            if not force_status and self.status == 'present':
                 self.status = self.determine_status()
 
         # Save first to get ID
