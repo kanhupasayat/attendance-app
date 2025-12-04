@@ -136,6 +136,7 @@ export const authAPI = {
   },
   getEmployee: (id) => api.get(`/auth/employees/${id}/`),
   getDashboardStats: () => cachedGet('/auth/dashboard-stats/', {}, 'dashboard-stats'),
+  getTodayEmployeeStatus: () => api.get('/auth/today-employee-status/'),
   // Notifications
   getNotifications: () => getArray('/auth/notifications/'),
   getUnreadCount: () => api.get('/auth/notifications/unread-count/'),

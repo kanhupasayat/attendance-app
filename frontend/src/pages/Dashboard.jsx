@@ -1,11 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Skeleton from '@mui/material/Skeleton';
+import Avatar from '@mui/material/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { attendanceAPI, leaveAPI, authAPI } from '../services/api';
 import Layout from '../components/Layout';
 import PunchButton from '../components/PunchButton';
 import AttendanceCalendar from '../components/AttendanceCalendar';
+
+// Function to generate consistent color based on name
+const stringToColor = (string) => {
+  let hash = 0;
+  for (let i = 0; i < string.length; i++) {
+    hash = string.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xff;
+    color += `00${value.toString(16)}`.slice(-2);
+  }
+  return color;
+};
 
 const Dashboard = () => {
   const { user, isAdmin } = useAuth();
@@ -18,6 +33,12 @@ const Dashboard = () => {
   const [adminStats, setAdminStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Today's Employee Status (Admin)
+  const [todayEmployeeStatus, setTodayEmployeeStatus] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const itemsPerPage = 5;
+
   const fetchData = async () => {
     try {
       const promises = [
@@ -28,6 +49,7 @@ const Dashboard = () => {
       // Fetch different data based on role
       if (isAdmin) {
         promises.push(authAPI.getDashboardStats());
+        promises.push(authAPI.getTodayEmployeeStatus());
       } else {
         promises.push(attendanceAPI.getOffDayStats({}));
         promises.push(attendanceAPI.getCompOffBalance({})); // Get comp off balance
@@ -47,8 +69,13 @@ const Dashboard = () => {
         setLeaveBalance(Array.isArray(leaveData) ? leaveData : []);
       }
 
-      if (isAdmin && results[2]) {
-        setAdminStats(results[2].data);
+      if (isAdmin) {
+        if (results[2]) {
+          setAdminStats(results[2].data);
+        }
+        if (results[3]) {
+          setTodayEmployeeStatus(results[3].data || []);
+        }
       } else if (!isAdmin) {
         if (results[2]) {
           setOffDayStats(results[2].data);
@@ -638,6 +665,194 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Today's Employee Status Table */}
+            {todayEmployeeStatus.length > 0 && (
+              <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Today's Employee Status
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                      className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                      <option value="not_punched">Not Punched</option>
+                      <option value="on_leave">On Leave</option>
+                      <option value="half_day">Half Day</option>
+                    </select>
+                    <span className="text-sm text-gray-500">
+                      Total: {todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter).length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="block md:hidden space-y-3">
+                  {(() => {
+                    const filtered = todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter);
+                    const start = (currentPage - 1) * itemsPerPage;
+                    const paginated = filtered.slice(start, start + itemsPerPage);
+
+                    return paginated.map((emp) => (
+                      <div key={emp.id} className="bg-gray-50 rounded-lg p-3 border">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar
+                              src={emp.photo}
+                              alt={emp.name}
+                              sx={{ width: 36, height: 36, bgcolor: stringToColor(emp.name || 'U'), fontSize: '0.875rem' }}
+                            >
+                              {emp.name?.charAt(0)?.toUpperCase()}
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-gray-900 text-sm">{emp.name}</p>
+                              <p className="text-xs text-gray-500">{emp.department || '-'}</p>
+                            </div>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            emp.status === 'present' ? 'bg-green-100 text-green-800' :
+                            emp.status === 'absent' ? 'bg-red-100 text-red-800' :
+                            emp.status === 'not_punched' ? 'bg-gray-100 text-gray-800' :
+                            emp.status === 'on_leave' ? 'bg-blue-100 text-blue-800' :
+                            emp.status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {emp.status === 'not_punched' ? 'Not Punched' : emp.status.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <p className="text-gray-500">Punch In</p>
+                            <p className="font-medium text-green-600">{emp.punch_in || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Punch Out</p>
+                            <p className="font-medium text-red-600">{emp.punch_out || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Hours</p>
+                            <p className="font-medium text-blue-600">{emp.working_hours || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Punch In</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Punch Out</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hours</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {(() => {
+                        const filtered = todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter);
+                        const start = (currentPage - 1) * itemsPerPage;
+                        const paginated = filtered.slice(start, start + itemsPerPage);
+
+                        return paginated.map((emp) => (
+                          <tr key={emp.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <Avatar
+                                  src={emp.photo}
+                                  alt={emp.name}
+                                  sx={{ width: 32, height: 32, bgcolor: stringToColor(emp.name || 'U'), fontSize: '0.75rem' }}
+                                >
+                                  {emp.name?.charAt(0)?.toUpperCase()}
+                                </Avatar>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{emp.name}</p>
+                                  <p className="text-xs text-gray-500">{emp.designation || '-'}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                              {emp.department || '-'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-green-600">
+                              {emp.punch_in || '-'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-red-600">
+                              {emp.punch_out || '-'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-600">
+                              {emp.working_hours || '-'}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                emp.status === 'present' ? 'bg-green-100 text-green-800' :
+                                emp.status === 'absent' ? 'bg-red-100 text-red-800' :
+                                emp.status === 'not_punched' ? 'bg-gray-100 text-gray-800' :
+                                emp.status === 'on_leave' ? 'bg-blue-100 text-blue-800' :
+                                emp.status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {emp.status === 'not_punched' ? 'Not Punched' : emp.status.replace('_', ' ').toUpperCase()}
+                              </span>
+                            </td>
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {(() => {
+                  const filtered = todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter);
+                  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+                  const start = (currentPage - 1) * itemsPerPage + 1;
+                  const end = Math.min(currentPage * itemsPerPage, filtered.length);
+
+                  if (totalPages <= 1) return null;
+
+                  return (
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4 pt-4 border-t">
+                      <p className="text-sm text-gray-500">
+                        Showing {start}-{end} of {filtered.length} employees
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <span className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-lg font-medium">
+                          {currentPage} / {totalPages}
+                        </span>
+                        <button
+                          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Leave Statistics */}
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">

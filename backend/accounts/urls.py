@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     AdminSignupView, LoginView, OTPRequestView, OTPVerifyView,
     ProfileView, ChangePasswordView, EmployeeListView, EmployeeDetailView,
-    CheckAdminExistsView, AdminDashboardStatsView,
+    CheckAdminExistsView, AdminDashboardStatsView, TodayEmployeeStatusView,
     NotificationListView, UnreadNotificationCountView, MarkNotificationReadView,
     MarkAllNotificationsReadView, ClearNotificationsView,
     # Profile Update Request Views
@@ -41,6 +41,7 @@ urlpatterns = [
 
     # Admin - Dashboard Stats
     path('dashboard-stats/', AdminDashboardStatsView.as_view(), name='dashboard-stats'),
+    path('today-employee-status/', TodayEmployeeStatusView.as_view(), name='today-employee-status'),
 
     # Notifications
     path('notifications/', NotificationListView.as_view(), name='notifications'),

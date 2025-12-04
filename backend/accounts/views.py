@@ -240,6 +240,63 @@ class AdminDashboardStatsView(APIView):
         })
 
 
+class TodayEmployeeStatusView(APIView):
+    """Get today's attendance status for all employees"""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from attendance.models import Attendance
+
+        today = timezone.now().date()
+
+        # Get all active employees
+        employees = User.objects.filter(
+            role='employee', is_active=True
+        ).select_related('shift').order_by('name')
+
+        # Get today's attendance records
+        today_attendance = {
+            att.user_id: att
+            for att in Attendance.objects.filter(date=today).select_related('user')
+        }
+
+        result = []
+        for emp in employees:
+            attendance = today_attendance.get(emp.id)
+
+            # Format time helper
+            def format_time(dt):
+                if not dt:
+                    return None
+                return dt.strftime('%I:%M %p')
+
+            # Determine status
+            if attendance:
+                status = attendance.status
+                punch_in = format_time(attendance.punch_in)
+                punch_out = format_time(attendance.punch_out)
+                working_hours = attendance.working_hours
+            else:
+                status = 'not_punched'
+                punch_in = None
+                punch_out = None
+                working_hours = None
+
+            result.append({
+                'id': emp.id,
+                'name': emp.name,
+                'department': emp.department,
+                'designation': emp.designation,
+                'photo': emp.photo.url if emp.photo else None,
+                'punch_in': punch_in,
+                'punch_out': punch_out,
+                'working_hours': working_hours,
+                'status': status,
+            })
+
+        return Response(result)
+
+
 # Notification Views
 class NotificationListView(generics.ListAPIView):
     """Get all notifications for the current user"""
