@@ -286,13 +286,13 @@ class TodayEmployeeStatusView(APIView):
                 punch_out = format_time(attendance.punch_out)
                 working_hours = attendance.working_hours
 
-                # Check if late (based on shift start time)
+                # Check if late (based on shift start time and grace period from shift settings)
                 if attendance.punch_in and emp.shift:
                     punch_in_time = attendance.punch_in.astimezone(ist).time()
                     shift_start = emp.shift.start_time
-                    # Add 15 minutes grace period
+                    grace_minutes = emp.shift.grace_period_minutes  # Use grace period from shift settings
                     from datetime import timedelta, datetime
-                    grace_time = (datetime.combine(today, shift_start) + timedelta(minutes=15)).time()
+                    grace_time = (datetime.combine(today, shift_start) + timedelta(minutes=grace_minutes)).time()
                     if punch_in_time > grace_time:
                         is_late = True
                         late_count += 1
