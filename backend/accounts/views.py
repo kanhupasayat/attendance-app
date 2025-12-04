@@ -292,7 +292,7 @@ class TodayEmployeeStatusView(APIView):
                 'name': emp.name,
                 'department': emp.department,
                 'designation': emp.designation,
-                'photo': emp.photo.url if emp.photo else None,
+                'photo_url': emp.photo.url if emp.photo else None,
                 'punch_in': punch_in,
                 'punch_out': punch_out,
                 'working_hours': working_hours,

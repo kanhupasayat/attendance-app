@@ -247,7 +247,7 @@ const Employees = () => {
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-3">
                         <Avatar
-                          src={employee.photo}
+                          src={employee.photo_url}
                           alt={employee.name}
                           sx={{
                             width: 44,
@@ -359,7 +359,7 @@ const Employees = () => {
                         <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <Avatar
-                              src={employee.photo}
+                              src={employee.photo_url}
                               alt={employee.name}
                               sx={{
                                 width: 40,

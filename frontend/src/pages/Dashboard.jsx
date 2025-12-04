@@ -707,7 +707,7 @@ const Dashboard = () => {
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2">
                             <Avatar
-                              src={emp.photo}
+                              src={emp.photo_url}
                               alt={emp.name}
                               sx={{ width: 36, height: 36, bgcolor: stringToColor(emp.name || 'U'), fontSize: '0.875rem' }}
                             >
@@ -772,7 +772,7 @@ const Dashboard = () => {
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-3">
                                 <Avatar
-                                  src={emp.photo}
+                                  src={emp.photo_url}
                                   alt={emp.name}
                                   sx={{ width: 32, height: 32, bgcolor: stringToColor(emp.name || 'U'), fontSize: '0.75rem' }}
                                 >
