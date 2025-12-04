@@ -157,7 +157,7 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
     'http://localhost:5173,http://127.0.0.1:5173,https://attendance-app-two-wine.vercel.app,https://attendance-app-k69a.vercel.app'
 ).split(',')
 # Allow all origins on Render (production) to avoid CORS issues
-CORS_ALLOW_ALL_ORIGINS = DEBUG or os.environ.get('RENDER', False)
+CORS_ALLOW_ALL_ORIGINS = DEBUG or bool(os.environ.get('RENDER'))
 CORS_ALLOW_CREDENTIALS = True
 
 # Office Location Settings (GPS)
