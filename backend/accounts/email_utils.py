@@ -6,19 +6,62 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 import logging
+import requests
+import os
 
 logger = logging.getLogger(__name__)
+
+# Brevo API Key (set in Render environment variables)
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+
+
+def send_email_via_brevo(to_email, to_name, subject, html_content, text_content=None):
+    """
+    Send email using Brevo HTTP API (works on Render)
+    """
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+
+    sender_email = os.environ.get('SENDER_EMAIL', 'kanhupasayat1@gmail.com')
+    sender_name = os.environ.get('SENDER_NAME', 'Attendance System')
+
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to_email, "name": to_name}],
+        "subject": subject,
+        "htmlContent": html_content
+    }
+
+    if text_content:
+        payload["textContent"] = text_content
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 201:
+            logger.info(f"Email sent successfully via Brevo to {to_email}")
+            return True
+        else:
+            logger.error(f"Brevo API error: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Failed to send email via Brevo: {e}")
+        return False
 
 
 # ================== OTP EMAIL ==================
 
 def send_otp_email(user, otp_code):
     """
-    Send OTP email for password reset/login
+    Send OTP email for password reset/login using Brevo API
     """
     subject = "Your OTP for Attendance System"
 
-    html_message = f"""
+    html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="color: white; margin: 0;">Attendance System</h1>
@@ -39,7 +82,7 @@ def send_otp_email(user, otp_code):
     </div>
     """
 
-    message = f"""
+    text_content = f"""
 Hello {user.name}!
 
 Your One-Time Password (OTP) for login is: {otp_code}
@@ -51,20 +94,14 @@ If you didn't request this OTP, please ignore this email.
 - Attendance System
     """
 
-    try:
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            html_message=html_message,
-            fail_silently=False,
-        )
-        logger.info(f"OTP email sent successfully to {user.email}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send OTP email to {user.email}: {e}")
-        return False
+    # Use Brevo API instead of SMTP
+    return send_email_via_brevo(
+        to_email=user.email,
+        to_name=user.name,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content
+    )
 
 
 def send_email_notification(subject, message, recipient_email, html_message=None):
