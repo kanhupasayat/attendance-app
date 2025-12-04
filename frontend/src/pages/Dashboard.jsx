@@ -35,9 +35,14 @@ const Dashboard = () => {
 
   // Today's Employee Status (Admin)
   const [todayEmployeeStatus, setTodayEmployeeStatus] = useState([]);
+  const [lateCount, setLateCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const itemsPerPage = 5;
+
+  // Monthly Summary (Employee)
+  const [monthlySummary, setMonthlySummary] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -54,6 +59,7 @@ const Dashboard = () => {
         promises.push(attendanceAPI.getOffDayStats({}));
         promises.push(attendanceAPI.getCompOffBalance({})); // Get comp off balance
         promises.push(leaveAPI.getMyRequests()); // Get recent leave requests
+        promises.push(attendanceAPI.getMyAttendance({ month: new Date().getMonth() + 1, year: new Date().getFullYear() })); // Monthly attendance
       }
 
       const results = await Promise.all(promises);
@@ -74,7 +80,9 @@ const Dashboard = () => {
           setAdminStats(results[2].data);
         }
         if (results[3]) {
-          setTodayEmployeeStatus(results[3].data || []);
+          const statusData = results[3].data;
+          setTodayEmployeeStatus(statusData.employees || statusData || []);
+          setLateCount(statusData.late_count || 0);
         }
       } else if (!isAdmin) {
         if (results[2]) {
@@ -90,6 +98,19 @@ const Dashboard = () => {
           // Get only recent 5 leave requests (handle paginated response)
           const leaveData = results[4].data.results || results[4].data;
           setRecentLeaves(Array.isArray(leaveData) ? leaveData.slice(0, 5) : []);
+        }
+        if (results[5]) {
+          // Calculate monthly summary
+          const attendanceData = results[5].data || [];
+          const summary = {
+            present: attendanceData.filter(a => a.status === 'present').length,
+            absent: attendanceData.filter(a => a.status === 'absent').length,
+            halfDay: attendanceData.filter(a => a.status === 'half_day').length,
+            onLeave: attendanceData.filter(a => a.status === 'on_leave').length,
+            late: attendanceData.filter(a => a.is_late).length,
+            totalDays: attendanceData.length
+          };
+          setMonthlySummary(summary);
         }
       }
     } catch (error) {
@@ -237,13 +258,24 @@ const Dashboard = () => {
         {/* Punch Section */}
         {!isAdmin && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">Today's Attendance</h2>
               </div>
-              <h2 className="text-lg sm:text-xl font-bold text-gray-800">Today's Attendance</h2>
+              {/* Shift Timing Display */}
+              {user?.shift_name && (
+                <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg">
+                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm text-blue-700 font-medium">{user.shift_name}</span>
+                </div>
+              )}
             </div>
             {todayAttendance?.is_off_day && (
               <div className="mb-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 text-purple-800 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
@@ -334,6 +366,72 @@ const Dashboard = () => {
 
         {/* Attendance Calendar for Employees */}
         {!isAdmin && <AttendanceCalendar />}
+
+        {/* Monthly Summary for Employees */}
+        {!isAdmin && monthlySummary && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-xl flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">This Month's Summary</h2>
+                <p className="text-xs text-gray-500">
+                  {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 text-center border border-green-100">
+                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p className="text-2xl font-bold text-green-700">{monthlySummary.present}</p>
+                <p className="text-xs text-green-600 font-medium">Present</p>
+              </div>
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 text-center border border-red-100">
+                <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <p className="text-2xl font-bold text-red-700">{monthlySummary.absent}</p>
+                <p className="text-xs text-red-600 font-medium">Absent</p>
+              </div>
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 text-center border border-blue-100">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-2xl font-bold text-blue-700">{monthlySummary.onLeave}</p>
+                <p className="text-xs text-blue-600 font-medium">On Leave</p>
+              </div>
+              <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl p-4 text-center border border-yellow-100">
+                <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-2xl font-bold text-yellow-700">{monthlySummary.halfDay}</p>
+                <p className="text-xs text-yellow-600 font-medium">Half Day</p>
+              </div>
+              <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-4 text-center border border-orange-100">
+                <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-2xl font-bold text-orange-700">{monthlySummary.late}</p>
+                <p className="text-xs text-orange-600 font-medium">Late</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Off-Day Work Stats for Employees */}
         {!isAdmin && offDayStats && offDayStats.total_off_day_work > 0 && (
@@ -664,6 +762,29 @@ const Dashboard = () => {
                   <p className="text-xs sm:text-sm opacity-90">On Leave</p>
                 </div>
               </div>
+
+              {/* Late Arrivals Alert */}
+              {lateCount > 0 && (
+                <div className="mt-4 bg-orange-500/20 backdrop-blur rounded-lg p-3 sm:p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-orange-400/40 rounded-full flex items-center justify-center">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-semibold">{lateCount} Late Arrival{lateCount > 1 ? 's' : ''}</p>
+                      <p className="text-xs opacity-80">Employees who arrived after grace period</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setStatusFilter('late')}
+                    className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-all"
+                  >
+                    View
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Today's Employee Status Table */}
@@ -676,7 +797,20 @@ const Dashboard = () => {
                     </svg>
                     Today's Employee Status
                   </h2>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Search Input */}
+                    <div className="relative">
+                      <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Search name..."
+                        value={searchQuery}
+                        onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                        className="pl-9 pr-3 py-1.5 border rounded-lg text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                     <select
                       value={statusFilter}
                       onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
@@ -688,9 +822,13 @@ const Dashboard = () => {
                       <option value="not_punched">Not Punched</option>
                       <option value="on_leave">On Leave</option>
                       <option value="half_day">Half Day</option>
+                      <option value="late">Late Arrivals</option>
                     </select>
                     <span className="text-sm text-gray-500">
-                      Total: {todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter).length}
+                      Total: {todayEmployeeStatus.filter(e =>
+                        (statusFilter === 'all' || (statusFilter === 'late' ? e.is_late : e.status === statusFilter)) &&
+                        (searchQuery === '' || e.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+                      ).length}
                     </span>
                   </div>
                 </div>
@@ -698,7 +836,10 @@ const Dashboard = () => {
                 {/* Mobile Card View */}
                 <div className="block md:hidden space-y-3">
                   {(() => {
-                    const filtered = todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter);
+                    const filtered = todayEmployeeStatus.filter(e =>
+                      (statusFilter === 'all' || (statusFilter === 'late' ? e.is_late : e.status === statusFilter)) &&
+                      (searchQuery === '' || e.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+                    );
                     const start = (currentPage - 1) * itemsPerPage;
                     const paginated = filtered.slice(start, start + itemsPerPage);
 
@@ -718,21 +859,28 @@ const Dashboard = () => {
                               <p className="text-xs text-gray-500">{emp.department || '-'}</p>
                             </div>
                           </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            emp.status === 'present' ? 'bg-green-100 text-green-800' :
-                            emp.status === 'absent' ? 'bg-red-100 text-red-800' :
-                            emp.status === 'not_punched' ? 'bg-gray-100 text-gray-800' :
-                            emp.status === 'on_leave' ? 'bg-blue-100 text-blue-800' :
-                            emp.status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {emp.status === 'not_punched' ? 'Not Punched' : emp.status.replace('_', ' ').toUpperCase()}
-                          </span>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              emp.status === 'present' ? 'bg-green-100 text-green-800' :
+                              emp.status === 'absent' ? 'bg-red-100 text-red-800' :
+                              emp.status === 'not_punched' ? 'bg-gray-100 text-gray-800' :
+                              emp.status === 'on_leave' ? 'bg-blue-100 text-blue-800' :
+                              emp.status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {emp.status === 'not_punched' ? 'Not Punched' : emp.status.replace('_', ' ').toUpperCase()}
+                            </span>
+                            {emp.is_late && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700">
+                                Late {emp.late_by_minutes}m
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="grid grid-cols-3 gap-2 text-xs">
                           <div>
                             <p className="text-gray-500">Punch In</p>
-                            <p className="font-medium text-green-600">{emp.punch_in || '-'}</p>
+                            <p className={`font-medium ${emp.is_late ? 'text-orange-600' : 'text-green-600'}`}>{emp.punch_in || '-'}</p>
                           </div>
                           <div>
                             <p className="text-gray-500">Punch Out</p>
@@ -763,7 +911,10 @@ const Dashboard = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {(() => {
-                        const filtered = todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter);
+                        const filtered = todayEmployeeStatus.filter(e =>
+                          (statusFilter === 'all' || (statusFilter === 'late' ? e.is_late : e.status === statusFilter)) &&
+                          (searchQuery === '' || e.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+                        );
                         const start = (currentPage - 1) * itemsPerPage;
                         const paginated = filtered.slice(start, start + itemsPerPage);
 
@@ -787,8 +938,11 @@ const Dashboard = () => {
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                               {emp.department || '-'}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-green-600">
+                            <td className={`px-4 py-3 whitespace-nowrap text-sm font-medium ${emp.is_late ? 'text-orange-600' : 'text-green-600'}`}>
                               {emp.punch_in || '-'}
+                              {emp.is_late && (
+                                <span className="ml-1 text-[10px] text-orange-500">({emp.late_by_minutes}m late)</span>
+                              )}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-red-600">
                               {emp.punch_out || '-'}
@@ -797,16 +951,23 @@ const Dashboard = () => {
                               {emp.working_hours || '-'}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                emp.status === 'present' ? 'bg-green-100 text-green-800' :
-                                emp.status === 'absent' ? 'bg-red-100 text-red-800' :
-                                emp.status === 'not_punched' ? 'bg-gray-100 text-gray-800' :
-                                emp.status === 'on_leave' ? 'bg-blue-100 text-blue-800' :
-                                emp.status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {emp.status === 'not_punched' ? 'Not Punched' : emp.status.replace('_', ' ').toUpperCase()}
-                              </span>
+                              <div className="flex flex-col gap-1">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium inline-block w-fit ${
+                                  emp.status === 'present' ? 'bg-green-100 text-green-800' :
+                                  emp.status === 'absent' ? 'bg-red-100 text-red-800' :
+                                  emp.status === 'not_punched' ? 'bg-gray-100 text-gray-800' :
+                                  emp.status === 'on_leave' ? 'bg-blue-100 text-blue-800' :
+                                  emp.status === 'half_day' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {emp.status === 'not_punched' ? 'Not Punched' : emp.status.replace('_', ' ').toUpperCase()}
+                                </span>
+                                {emp.is_late && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-700 inline-block w-fit">
+                                    LATE
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ));
@@ -817,7 +978,10 @@ const Dashboard = () => {
 
                 {/* Pagination */}
                 {(() => {
-                  const filtered = todayEmployeeStatus.filter(e => statusFilter === 'all' || e.status === statusFilter);
+                  const filtered = todayEmployeeStatus.filter(e =>
+                    (statusFilter === 'all' || (statusFilter === 'late' ? e.is_late : e.status === statusFilter)) &&
+                    (searchQuery === '' || e.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+                  );
                   const totalPages = Math.ceil(filtered.length / itemsPerPage);
                   const start = (currentPage - 1) * itemsPerPage + 1;
                   const end = Math.min(currentPage * itemsPerPage, filtered.length);

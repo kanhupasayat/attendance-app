@@ -272,15 +272,34 @@ class TodayEmployeeStatusView(APIView):
             return dt_ist.strftime('%I:%M %p')
 
         result = []
+        late_count = 0
+
         for emp in employees:
             attendance = today_attendance.get(emp.id)
+            is_late = False
+            late_by_minutes = 0
 
-            # Determine status
+            # Determine status and late calculation
             if attendance:
                 status = attendance.status
                 punch_in = format_time(attendance.punch_in)
                 punch_out = format_time(attendance.punch_out)
                 working_hours = attendance.working_hours
+
+                # Check if late (based on shift start time)
+                if attendance.punch_in and emp.shift:
+                    punch_in_time = attendance.punch_in.astimezone(ist).time()
+                    shift_start = emp.shift.start_time
+                    # Add 15 minutes grace period
+                    from datetime import timedelta, datetime
+                    grace_time = (datetime.combine(today, shift_start) + timedelta(minutes=15)).time()
+                    if punch_in_time > grace_time:
+                        is_late = True
+                        late_count += 1
+                        # Calculate late by minutes
+                        punch_dt = datetime.combine(today, punch_in_time)
+                        shift_dt = datetime.combine(today, shift_start)
+                        late_by_minutes = int((punch_dt - shift_dt).total_seconds() / 60)
             else:
                 status = 'not_punched'
                 punch_in = None
@@ -297,9 +316,16 @@ class TodayEmployeeStatusView(APIView):
                 'punch_out': punch_out,
                 'working_hours': working_hours,
                 'status': status,
+                'is_late': is_late,
+                'late_by_minutes': late_by_minutes,
+                'shift_name': emp.shift.name if emp.shift else None,
+                'shift_start': emp.shift.start_time.strftime('%I:%M %p') if emp.shift else None,
             })
 
-        return Response(result)
+        return Response({
+            'employees': result,
+            'late_count': late_count
+        })
 
 
 # Notification Views
