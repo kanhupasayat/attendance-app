@@ -14,6 +14,7 @@ from .serializers import (
     ActivityLogSerializer
 )
 from .utils import notify_profile_update_applied, notify_profile_update_status
+from .email_utils import send_otp_email
 from .activity_utils import (
     log_activity, log_employee_added, log_employee_updated, log_employee_deactivated,
     log_profile_update_requested, log_profile_update_reviewed
@@ -85,10 +86,15 @@ class OTPRequestView(APIView):
                 expires_at=timezone.now() + timezone.timedelta(minutes=10)
             )
 
-            # In production, send OTP via SMS gateway
-            # TODO: Integrate SMS gateway here
+            # Send OTP via email
+            email_sent = False
+            if user.email:
+                email_sent = send_otp_email(user, otp.otp)
+
             return Response({
-                "message": "OTP sent successfully"
+                "message": "OTP sent successfully",
+                "email_sent": email_sent,
+                "email_hint": user.email[:3] + "***" + user.email[user.email.index('@'):] if user.email else None
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

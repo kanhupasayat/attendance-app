@@ -10,6 +10,63 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# ================== OTP EMAIL ==================
+
+def send_otp_email(user, otp_code):
+    """
+    Send OTP email for password reset/login
+    """
+    subject = "Your OTP for Attendance System"
+
+    html_message = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0;">Attendance System</h1>
+        </div>
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333;">Hello {user.name}!</h2>
+            <p style="color: #666; font-size: 16px;">Your One-Time Password (OTP) for login is:</p>
+            <div style="background: #667eea; color: white; font-size: 32px; font-weight: bold; padding: 20px; text-align: center; border-radius: 10px; letter-spacing: 8px; margin: 20px 0;">
+                {otp_code}
+            </div>
+            <p style="color: #666; font-size: 14px;">This OTP is valid for <strong>10 minutes</strong>.</p>
+            <p style="color: #999; font-size: 12px;">If you didn't request this OTP, please ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+                This is an automated message. Please do not reply to this email.
+            </p>
+        </div>
+    </div>
+    """
+
+    message = f"""
+Hello {user.name}!
+
+Your One-Time Password (OTP) for login is: {otp_code}
+
+This OTP is valid for 10 minutes.
+
+If you didn't request this OTP, please ignore this email.
+
+- Attendance System
+    """
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        logger.info(f"OTP email sent successfully to {user.email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send OTP email to {user.email}: {e}")
+        return False
+
+
 def send_email_notification(subject, message, recipient_email, html_message=None):
     """
     Send email notification to a single recipient
