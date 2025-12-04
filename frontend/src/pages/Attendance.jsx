@@ -152,6 +152,20 @@ const Attendance = () => {
     }
   };
 
+  const handleClearPunchOut = async (record) => {
+    if (!confirm(`Clear punch out for ${record.user_details?.name}?\n\nThis will allow the employee to punch out again.`)) {
+      return;
+    }
+
+    try {
+      await attendanceAPI.adminClearPunchOut(record.id);
+      toast.success('Punch out cleared. Employee can now punch out again.');
+      fetchAttendance();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to clear punch out');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -294,13 +308,25 @@ const Attendance = () => {
                         <p className="font-medium text-blue-600">{record.working_hours || '-'}</p>
                       </div>
                     </div>
-                    {isAdmin && record.status !== 'absent' && (
-                      <button
-                        onClick={() => handleMarkAbsent(record)}
-                        className="mt-2 text-xs text-red-600 hover:text-red-800"
-                      >
-                        Mark Absent
-                      </button>
+                    {isAdmin && (
+                      <div className="mt-2 flex gap-3">
+                        {record.status !== 'absent' && (
+                          <button
+                            onClick={() => handleMarkAbsent(record)}
+                            className="text-xs text-red-600 hover:text-red-800"
+                          >
+                            Mark Absent
+                          </button>
+                        )}
+                        {record.punch_out && (
+                          <button
+                            onClick={() => handleClearPunchOut(record)}
+                            className="text-xs text-orange-600 hover:text-orange-800"
+                          >
+                            Clear Punch Out
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -387,9 +413,18 @@ const Attendance = () => {
                             {record.status !== 'absent' && (
                               <button
                                 onClick={() => handleMarkAbsent(record)}
-                                className="text-red-600 hover:text-red-800"
+                                className="text-red-600 hover:text-red-800 mr-3"
                               >
                                 Absent
+                              </button>
+                            )}
+                            {record.punch_out && (
+                              <button
+                                onClick={() => handleClearPunchOut(record)}
+                                className="text-orange-600 hover:text-orange-800"
+                                title="Clear punch out so employee can punch out again"
+                              >
+                                Clear Out
                               </button>
                             )}
                           </td>

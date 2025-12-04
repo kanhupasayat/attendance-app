@@ -212,6 +212,10 @@ export const attendanceAPI = {
     clearCache();
     return api.post('/attendance/admin/bulk-update/', data);
   },
+  adminClearPunchOut: (id) => {
+    clearCache();
+    return api.post(`/attendance/admin/clear-punch-out/${id}/`);
+  },
   // Shift Management (Admin)
   getShifts: () => cachedGet('/attendance/shifts/', {}, 'shifts'),
   createShift: (data) => {

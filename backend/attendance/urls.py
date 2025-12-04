@@ -8,7 +8,7 @@ from .views import (
     WFHApplyView, MyWFHListView, AllWFHListView, WFHReviewView,
     CancelWFHView, TodayWFHStatusView, AutoPunchOutView,
     AdminAttendanceCreateView, AdminAttendanceUpdateView,
-    AdminMarkAbsentView, AdminBulkAttendanceView,
+    AdminMarkAbsentView, AdminBulkAttendanceView, AdminClearPunchOutView,
     ShiftListCreateView, ShiftDetailView, AssignShiftView,
     MyCompOffListView, AllCompOffListView, CompOffBalanceView,
     UseCompOffView, AdminCreateCompOffView, UseCompOffToReduceLOPView
@@ -54,6 +54,7 @@ urlpatterns = [
     path('admin/update/<int:pk>/', AdminAttendanceUpdateView.as_view(), name='admin-attendance-update'),
     path('admin/mark-absent/', AdminMarkAbsentView.as_view(), name='admin-mark-absent'),
     path('admin/bulk-update/', AdminBulkAttendanceView.as_view(), name='admin-bulk-attendance'),
+    path('admin/clear-punch-out/<int:pk>/', AdminClearPunchOutView.as_view(), name='admin-clear-punch-out'),
 
     # Shift management (Admin)
     path('shifts/', ShiftListCreateView.as_view(), name='shift-list-create'),

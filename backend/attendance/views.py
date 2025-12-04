@@ -705,6 +705,29 @@ class RegularizationReviewView(APIView):
         new_status = serializer.validated_data['status']
         review_remarks = serializer.validated_data.get('review_remarks', '')
 
+        # VALIDATION: Check if requested time is in the future (only for approval)
+        if new_status == 'approved':
+            now = timezone.now()
+            today = get_india_date()
+
+            # If regularization is for today, check if requested times are in the future
+            if regularization.date == today:
+                current_time = now.astimezone(pytz.timezone('Asia/Kolkata')).time()
+
+                if regularization.requested_punch_in:
+                    if regularization.requested_punch_in > current_time:
+                        return Response(
+                            {"error": f"Cannot set punch in time ({regularization.requested_punch_in.strftime('%I:%M %p')}) in the future. Current time is {current_time.strftime('%I:%M %p')}. Please wait until that time has passed."},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                if regularization.requested_punch_out:
+                    if regularization.requested_punch_out > current_time:
+                        return Response(
+                            {"error": f"Cannot set punch out time ({regularization.requested_punch_out.strftime('%I:%M %p')}) in the future. Current time is {current_time.strftime('%I:%M %p')}. Please wait until that time has passed."},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
         regularization.status = new_status
         regularization.reviewed_by = request.user
         regularization.reviewed_on = timezone.now()
@@ -1228,6 +1251,49 @@ class AdminBulkAttendanceView(APIView):
         return Response({
             "message": f"Bulk attendance update completed for {date}",
             "results": results
+        })
+
+
+class AdminClearPunchOutView(APIView):
+    """Admin can clear punch out so employee can punch out again"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        try:
+            attendance = Attendance.objects.get(pk=pk)
+        except Attendance.DoesNotExist:
+            return Response(
+                {"error": "Attendance record not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not attendance.punch_out:
+            return Response(
+                {"error": "No punch out to clear"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Store old punch out for notes
+        old_punch_out = attendance.punch_out
+
+        # Clear punch out
+        attendance.punch_out = None
+        attendance.punch_out_latitude = None
+        attendance.punch_out_longitude = None
+        attendance.punch_out_ip = None
+        attendance.working_hours = 0
+        attendance.status = 'present'  # Reset to present (will update on new punch out)
+
+        # Add note about clearing
+        existing_notes = attendance.notes or ''
+        attendance.notes = f"{existing_notes}\n[Admin cleared punch out: {old_punch_out.strftime('%H:%M')}]".strip()
+
+        # Save without auto-calculating status
+        attendance.save(force_status=True)
+
+        return Response({
+            "message": f"Punch out cleared for {attendance.user.name}. Employee can now punch out again.",
+            "data": AttendanceSerializer(attendance).data
         })
 
 
