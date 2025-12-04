@@ -6,16 +6,40 @@ import { useAuth } from '../context/AuthContext';
 import FaceVerification from './FaceVerification';
 import PunchErrorModal from './PunchErrorModal';
 
-const PunchButton = ({ type, onSuccess, disabled }) => {
+const PunchButton = ({ type, onSuccess, disabled, todayAttendance }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showFaceVerification, setShowFaceVerification] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showEarlyPunchOutModal, setShowEarlyPunchOutModal] = useState(false);
+  const [earlyPunchOutInfo, setEarlyPunchOutInfo] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [leaveInfo, setLeaveInfo] = useState(null);
   const [pendingCoords, setPendingCoords] = useState(null);
   const { getLocation } = useGeolocation();
+
+  // Default shift hours (8 hours minus 1 hour break = 8 hours work expected)
+  const REQUIRED_HOURS = 8;
+  const HALF_DAY_HOURS = 4;
+
+  // Calculate worked hours from punch in time
+  const calculateWorkedHours = () => {
+    if (!todayAttendance?.punch_in) return 0;
+    const punchInTime = new Date(todayAttendance.punch_in);
+    const now = new Date();
+    const diffMs = now - punchInTime;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    // Deduct 1 hour break if worked more than 4 hours
+    const breakDeduction = diffHours > 4 ? 1 : 0;
+    return Math.max(0, diffHours - breakDeduction);
+  };
+
+  const formatHoursMinutes = (hours) => {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}h ${m}m`;
+  };
 
   const showError = (message) => {
     setErrorMessage(message);
@@ -69,6 +93,25 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
         setShowFaceVerification(true);
         setLoading(false);
         return;
+      }
+
+      // For punch OUT, check if shift is complete
+      if (type === 'out' && todayAttendance?.punch_in) {
+        const workedHours = calculateWorkedHours();
+
+        if (workedHours < REQUIRED_HOURS) {
+          // Show warning modal
+          setPendingCoords(coords);
+          setEarlyPunchOutInfo({
+            workedHours,
+            requiredHours: REQUIRED_HOURS,
+            remainingHours: REQUIRED_HOURS - workedHours,
+            status: workedHours < HALF_DAY_HOURS ? 'Absent' : 'Half Day'
+          });
+          setShowEarlyPunchOutModal(true);
+          setLoading(false);
+          return;
+        }
       }
 
       // No face verification required, proceed with punch
@@ -136,6 +179,29 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
     setShowLeaveModal(false);
     setLeaveInfo(null);
     setPendingCoords(null);
+  };
+
+  // Early punch out handlers
+  const handleConfirmEarlyPunchOut = async () => {
+    setShowEarlyPunchOutModal(false);
+    setLoading(true);
+    try {
+      await performPunchIn(pendingCoords, false);
+    } catch (error) {
+      const message = error.response?.data?.error ||
+        (error.message?.includes('Network') ? 'No internet connection. Please check your network.' : 'Failed to punch out');
+      showError(message);
+    } finally {
+      setLoading(false);
+      setPendingCoords(null);
+      setEarlyPunchOutInfo(null);
+    }
+  };
+
+  const handleCancelEarlyPunchOut = () => {
+    setShowEarlyPunchOutModal(false);
+    setPendingCoords(null);
+    setEarlyPunchOutInfo(null);
   };
 
   const buttonClass = type === 'in'
@@ -251,6 +317,78 @@ const PunchButton = ({ type, onSuccess, disabled }) => {
             setErrorMessage('');
           }}
         />
+      )}
+
+      {/* Early Punch Out Warning Modal */}
+      {showEarlyPunchOutModal && earlyPunchOutInfo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mr-4">
+                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">Early Punch Out</h2>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-700 mb-3">Your shift is not complete yet!</p>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-orange-800">Worked Hours:</span>
+                  <span className="text-sm font-bold text-orange-800">{formatHoursMinutes(earlyPunchOutInfo.workedHours)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-orange-800">Required Hours:</span>
+                  <span className="text-sm font-bold text-orange-800">{earlyPunchOutInfo.requiredHours}h</span>
+                </div>
+                <div className="flex justify-between border-t border-orange-200 pt-2">
+                  <span className="text-sm text-orange-800">Remaining:</span>
+                  <span className="text-sm font-bold text-red-600">{formatHoursMinutes(earlyPunchOutInfo.remainingHours)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
+              <p className="text-sm text-red-700">
+                <span className="font-bold">Warning:</span> If you punch out now, your attendance will be marked as{' '}
+                <span className="font-bold">{earlyPunchOutInfo.status}</span>.
+              </p>
+            </div>
+
+            <p className="text-gray-600 text-sm mb-6">
+              Are you sure you want to punch out early?
+            </p>
+
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={handleCancelEarlyPunchOut}
+                disabled={loading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                No, Continue Working
+              </button>
+              <button
+                onClick={handleConfirmEarlyPunchOut}
+                disabled={loading}
+                className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50 flex items-center"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  'Yes, Punch Out'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

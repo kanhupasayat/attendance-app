@@ -255,6 +255,7 @@ const Dashboard = () => {
                   type="out"
                   onSuccess={fetchData}
                   disabled={!hasPunchedIn || hasPunchedOut}
+                  todayAttendance={todayAttendance}
                 />
               </div>
             </div>
