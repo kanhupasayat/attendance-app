@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { attendanceAPI, authAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -454,21 +456,21 @@ const CompOff = () => {
                   </p>
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Select Date to Use *
-                  </label>
-                  <input
-                    type="date"
-                    value={useDate}
-                    min={getMinUseDate()}
-                    max={selectedCompOff.expires_on}
-                    onChange={(e) => setUseDate(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2.5 sm:py-2 text-base"
-                    required
+                  <DatePicker
+                    label="Select Date to Use *"
+                    value={useDate ? dayjs(useDate) : null}
+                    onChange={(newValue) => setUseDate(newValue ? newValue.format('YYYY-MM-DD') : '')}
+                    minDate={dayjs(getMinUseDate())}
+                    maxDate={dayjs(selectedCompOff.expires_on)}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        fullWidth: true,
+                        required: true,
+                        helperText: 'Select a future date before the comp off expires'
+                      }
+                    }}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Select a future date before the comp off expires
-                  </p>
                 </div>
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-4">
                   <button
@@ -521,17 +523,19 @@ const CompOff = () => {
                   </select>
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Earned Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={addFormData.earned_date}
-                    onChange={(e) =>
-                      setAddFormData({ ...addFormData, earned_date: e.target.value })
+                  <DatePicker
+                    label="Earned Date *"
+                    value={addFormData.earned_date ? dayjs(addFormData.earned_date) : null}
+                    onChange={(newValue) =>
+                      setAddFormData({ ...addFormData, earned_date: newValue ? newValue.format('YYYY-MM-DD') : '' })
                     }
-                    className="w-full border rounded-lg px-3 py-2.5 sm:py-2 text-base"
-                    required
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        fullWidth: true,
+                        required: true
+                      }
+                    }}
                   />
                 </div>
                 <div className="mb-4">

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Skeleton from '@mui/material/Skeleton';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { leaveAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -547,27 +549,38 @@ const Leaves = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2.5 sm:py-2 text-base"
-                      required
+                    <DatePicker
+                      label="Start Date"
+                      value={formData.start_date ? dayjs(formData.start_date) : null}
+                      onChange={(newValue) => setFormData({
+                        ...formData,
+                        start_date: newValue ? newValue.format('YYYY-MM-DD') : ''
+                      })}
+                      slotProps={{
+                        textField: {
+                          size: 'small',
+                          fullWidth: true,
+                          required: true
+                        }
+                      }}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                      className="w-full border rounded-lg px-3 py-2.5 sm:py-2 text-base"
-                      required
+                    <DatePicker
+                      label="End Date"
+                      value={formData.end_date ? dayjs(formData.end_date) : null}
+                      onChange={(newValue) => setFormData({
+                        ...formData,
+                        end_date: newValue ? newValue.format('YYYY-MM-DD') : ''
+                      })}
+                      minDate={formData.start_date ? dayjs(formData.start_date) : undefined}
+                      slotProps={{
+                        textField: {
+                          size: 'small',
+                          fullWidth: true,
+                          required: true
+                        }
+                      }}
                     />
                   </div>
                 </div>

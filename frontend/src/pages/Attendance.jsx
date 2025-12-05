@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Skeleton from '@mui/material/Skeleton';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { attendanceAPI, authAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -663,15 +665,20 @@ const Attendance = () => {
 
               {modalMode === 'add' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
+                  <DatePicker
+                    label="Date *"
+                    value={formData.date ? dayjs(formData.date) : null}
+                    onChange={(newValue) => setFormData({
+                      ...formData,
+                      date: newValue ? newValue.format('YYYY-MM-DD') : ''
+                    })}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        fullWidth: true,
+                        required: true
+                      }
+                    }}
                   />
                 </div>
               )}

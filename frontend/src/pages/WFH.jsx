@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 import { useAuth } from '../context/AuthContext';
 import { attendanceAPI } from '../services/api';
 import Layout from '../components/Layout';
@@ -330,18 +332,23 @@ const WFH = () => {
               </h2>
               <form onSubmit={handleApply}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    min={today}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2.5 sm:py-2 text-base"
-                    required
+                  <DatePicker
+                    label="Date"
+                    value={formData.date ? dayjs(formData.date) : null}
+                    onChange={(newValue) => setFormData({
+                      ...formData,
+                      date: newValue ? newValue.format('YYYY-MM-DD') : ''
+                    })}
+                    minDate={dayjs(today)}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        fullWidth: true,
+                        required: true,
+                        helperText: 'You can apply for today or future dates'
+                      }
+                    }}
                   />
-                  <p className="text-xs text-gray-500 mt-1">You can apply for today or future dates</p>
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">

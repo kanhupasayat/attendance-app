@@ -3,6 +3,8 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { lazy, Suspense } from 'react';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 // Loading Spinner Component
 const PageLoader = () => (
@@ -34,8 +36,9 @@ const CompOff = lazy(() => import('./pages/CompOff'));
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <AuthProvider>
+        <Router>
         <Toaster position="top-right" />
         <Suspense fallback={<PageLoader />}>
           <Routes>
@@ -160,8 +163,9 @@ function App() {
             />
           </Routes>
         </Suspense>
-      </Router>
-    </AuthProvider>
+        </Router>
+      </AuthProvider>
+    </LocalizationProvider>
   );
 }
 
