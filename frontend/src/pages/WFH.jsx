@@ -13,7 +13,8 @@ const WFH = () => {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [formData, setFormData] = useState({
-    date: '',
+    start_date: '',
+    end_date: '',
     reason: '',
   });
 
@@ -41,10 +42,18 @@ const WFH = () => {
   const handleApply = async (e) => {
     e.preventDefault();
     try {
-      await attendanceAPI.applyWFH(formData);
-      toast.success('WFH request submitted!');
+      const payload = {
+        start_date: formData.start_date,
+        end_date: formData.end_date || null,
+        reason: formData.reason,
+      };
+      await attendanceAPI.applyWFH(payload);
+      const days = formData.end_date && formData.end_date !== formData.start_date
+        ? 'WFH requests submitted!'
+        : 'WFH request submitted!';
+      toast.success(days);
       setShowApplyModal(false);
-      setFormData({ date: '', reason: '' });
+      setFormData({ start_date: '', end_date: '', reason: '' });
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to submit request');
@@ -331,13 +340,13 @@ const WFH = () => {
                 Apply for Work From Home
               </h2>
               <form onSubmit={handleApply}>
-                <div className="mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <DatePicker
-                    label="Date"
-                    value={formData.date ? dayjs(formData.date) : null}
+                    label="Start Date"
+                    value={formData.start_date ? dayjs(formData.start_date) : null}
                     onChange={(newValue) => setFormData({
                       ...formData,
-                      date: newValue ? newValue.format('YYYY-MM-DD') : ''
+                      start_date: newValue ? newValue.format('YYYY-MM-DD') : ''
                     })}
                     minDate={dayjs(today)}
                     slotProps={{
@@ -345,11 +354,28 @@ const WFH = () => {
                         size: 'small',
                         fullWidth: true,
                         required: true,
-                        helperText: 'You can apply for today or future dates'
+                      }
+                    }}
+                  />
+                  <DatePicker
+                    label="End Date (Optional)"
+                    value={formData.end_date ? dayjs(formData.end_date) : null}
+                    onChange={(newValue) => setFormData({
+                      ...formData,
+                      end_date: newValue ? newValue.format('YYYY-MM-DD') : ''
+                    })}
+                    minDate={formData.start_date ? dayjs(formData.start_date) : dayjs(today)}
+                    slotProps={{
+                      textField: {
+                        size: 'small',
+                        fullWidth: true,
                       }
                     }}
                   />
                 </div>
+                <p className="text-xs text-gray-500 mb-4">
+                  Leave End Date empty for single day WFH. Select End Date for multiple days.
+                </p>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Reason
@@ -368,7 +394,7 @@ const WFH = () => {
                     type="button"
                     onClick={() => {
                       setShowApplyModal(false);
-                      setFormData({ date: '', reason: '' });
+                      setFormData({ start_date: '', end_date: '', reason: '' });
                     }}
                     className="w-full sm:w-auto px-4 py-2.5 sm:py-2 border rounded-lg hover:bg-gray-50"
                   >

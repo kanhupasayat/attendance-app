@@ -34,6 +34,7 @@ const Employees = () => {
     designation: '',
     weekly_off: 6,
     password: '',
+    is_permanent_wfh: false,
   });
 
   const weekDays = [
@@ -102,6 +103,7 @@ const Employees = () => {
       designation: employee.designation || '',
       weekly_off: employee.weekly_off ?? 6,
       password: '',
+      is_permanent_wfh: employee.is_permanent_wfh || false,
     });
     setShowModal(true);
   };
@@ -128,6 +130,7 @@ const Employees = () => {
       designation: '',
       weekly_off: 6,
       password: '',
+      is_permanent_wfh: false,
     });
   };
 
@@ -270,13 +273,20 @@ const Employees = () => {
                           <p className="text-gray-600 text-xs">{employee.mobile}</p>
                         </div>
                       </div>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        employee.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {employee.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                      <div className="flex gap-1 flex-wrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          employee.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {employee.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                        {employee.is_permanent_wfh && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            WFH
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs mb-3">
@@ -396,13 +406,20 @@ const Employees = () => {
                           {employee.weekly_off_display || 'Sunday'}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            employee.is_active
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {employee.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                          <div className="flex gap-1 flex-wrap">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              employee.is_active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {employee.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                            {employee.is_permanent_wfh && (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                WFH
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm">
                           <button
@@ -520,6 +537,20 @@ const Employees = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="mb-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_permanent_wfh}
+                      onChange={(e) => setFormData({ ...formData, is_permanent_wfh: e.target.checked })}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">Permanent Work From Home</span>
+                      <p className="text-xs text-gray-500">Employee can punch in from anywhere</p>
+                    </div>
+                  </label>
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
