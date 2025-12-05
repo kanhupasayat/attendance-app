@@ -166,7 +166,7 @@ OFFICE_LONGITUDE = float(os.environ.get('OFFICE_LONGITUDE', '77.2090'))
 OFFICE_RADIUS_METERS = int(os.environ.get('OFFICE_RADIUS_METERS', '50'))
 
 # Allowed Office IPs (for IP-based validation)
-ALLOWED_OFFICE_IPS = os.environ.get('ALLOWED_OFFICE_IPS', '127.0.0.1').split(',')
+ALLOWED_OFFICE_IPS = os.environ.get('ALLOWED_OFFICE_IPS', '127.0.0.1,49.205.145.158,192.168.1.135,192.168.0.143,192.168.29.234,192.168.1.107').split(',')
 
 # Leave Settings
 ANNUAL_CASUAL_LEAVE = 12
@@ -213,5 +213,34 @@ STORAGES = {
     },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'accounts': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
