@@ -86,6 +86,21 @@ const WFH = () => {
     }
   };
 
+  const handleBulkReview = async (ids, status) => {
+    const remarks = window.prompt('Add remarks (optional):');
+    try {
+      await attendanceAPI.bulkReviewWFH({
+        wfh_ids: ids,
+        status,
+        review_remarks: remarks || '',
+      });
+      toast.success(`${ids.length} request(s) ${status}`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to review');
+    }
+  };
+
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-IN', {
       day: '2-digit',
@@ -105,6 +120,66 @@ const WFH = () => {
         {status.toUpperCase()}
       </span>
     );
+  };
+
+  // Group consecutive WFH requests by user, reason, and status into date ranges
+  const groupRequestsByDateRange = (requests) => {
+    if (!requests.length) return [];
+
+    // Sort by user, then by date
+    const sorted = [...requests].sort((a, b) => {
+      const userCompare = (a.user_details?.name || '').localeCompare(b.user_details?.name || '');
+      if (userCompare !== 0) return userCompare;
+      return new Date(a.date) - new Date(b.date);
+    });
+
+    const grouped = [];
+    let currentGroup = null;
+
+    sorted.forEach((request) => {
+      const requestDate = new Date(request.date);
+
+      if (currentGroup &&
+          currentGroup.user === request.user &&
+          currentGroup.reason === request.reason &&
+          currentGroup.status === request.status) {
+        // Check if this date is consecutive (within 1 day of end_date)
+        const dayDiff = (requestDate - new Date(currentGroup.end_date)) / (1000 * 60 * 60 * 24);
+        if (dayDiff <= 1) {
+          // Extend the current group
+          currentGroup.end_date = request.date;
+          currentGroup.ids.push(request.id);
+          currentGroup.count++;
+          return;
+        }
+      }
+
+      // Start a new group
+      currentGroup = {
+        id: request.id,
+        ids: [request.id],
+        user: request.user,
+        user_details: request.user_details,
+        start_date: request.date,
+        end_date: request.date,
+        reason: request.reason,
+        status: request.status,
+        review_remarks: request.review_remarks,
+        count: 1,
+      };
+      grouped.push(currentGroup);
+    });
+
+    return grouped;
+  };
+
+  const groupedRequests = isAdmin ? groupRequestsByDateRange(requests) : requests;
+
+  const formatDateRange = (group) => {
+    if (group.start_date === group.end_date) {
+      return formatDate(group.start_date);
+    }
+    return `${formatDate(group.start_date)} - ${formatDate(group.end_date)} (${group.count} days)`;
   };
 
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -174,18 +249,20 @@ const WFH = () => {
             <div className="flex justify-center items-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : requests.length > 0 ? (
+          ) : (isAdmin ? groupedRequests : requests).length > 0 ? (
             <>
               {/* Mobile Card View */}
               <div className="block lg:hidden space-y-3">
-                {requests.map((request) => (
+                {(isAdmin ? groupedRequests : requests).map((request) => (
                   <div key={request.id} className="bg-gray-50 rounded-lg p-3 sm:p-4 border">
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         {isAdmin && (
                           <p className="font-medium text-gray-900 text-sm">{request.user_details?.name}</p>
                         )}
-                        <p className="text-blue-600 font-medium text-sm">{formatDate(request.date)}</p>
+                        <p className="text-blue-600 font-medium text-sm">
+                          {isAdmin && request.start_date ? formatDateRange(request) : formatDate(request.date)}
+                        </p>
                       </div>
                       {getStatusBadge(request.status)}
                     </div>
@@ -205,16 +282,16 @@ const WFH = () => {
                       {isAdmin && request.status === 'pending' && (
                         <>
                           <button
-                            onClick={() => handleReview(request.id, 'approved')}
+                            onClick={() => handleBulkReview(request.ids, 'approved')}
                             className="flex-1 bg-green-100 text-green-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-green-200"
                           >
-                            Approve
+                            Approve {request.count > 1 ? `(${request.count})` : ''}
                           </button>
                           <button
-                            onClick={() => handleReview(request.id, 'rejected')}
+                            onClick={() => handleBulkReview(request.ids, 'rejected')}
                             className="flex-1 bg-red-100 text-red-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-red-200"
                           >
-                            Reject
+                            Reject {request.count > 1 ? `(${request.count})` : ''}
                           </button>
                         </>
                       )}
@@ -256,7 +333,7 @@ const WFH = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {requests.map((request) => (
+                    {(isAdmin ? groupedRequests : requests).map((request) => (
                       <tr key={request.id} className="hover:bg-gray-50">
                         {isAdmin && (
                           <td className="px-4 py-4 whitespace-nowrap">
@@ -269,7 +346,7 @@ const WFH = () => {
                           </td>
                         )}
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(request.date)}
+                          {isAdmin && request.start_date ? formatDateRange(request) : formatDate(request.date)}
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900 max-w-xs">
                           <div className="truncate" title={request.reason}>
@@ -288,16 +365,16 @@ const WFH = () => {
                           {isAdmin && request.status === 'pending' && (
                             <div className="space-x-2">
                               <button
-                                onClick={() => handleReview(request.id, 'approved')}
+                                onClick={() => handleBulkReview(request.ids, 'approved')}
                                 className="text-green-600 hover:text-green-800"
                               >
-                                Approve
+                                Approve {request.count > 1 ? `(${request.count})` : ''}
                               </button>
                               <button
-                                onClick={() => handleReview(request.id, 'rejected')}
+                                onClick={() => handleBulkReview(request.ids, 'rejected')}
                                 className="text-red-600 hover:text-red-800"
                               >
-                                Reject
+                                Reject {request.count > 1 ? `(${request.count})` : ''}
                               </button>
                             </div>
                           )}

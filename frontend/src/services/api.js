@@ -198,6 +198,7 @@ export const attendanceAPI = {
   getMyWFH: () => getArray('/attendance/wfh/my-requests/'),
   getAllWFH: (params) => getArray('/attendance/wfh/all/', params),
   reviewWFH: (id, data) => api.post(`/attendance/wfh/review/${id}/`, data),
+  bulkReviewWFH: (data) => api.post('/attendance/wfh/bulk-review/', data),
   cancelWFH: (id) => api.post(`/attendance/wfh/cancel/${id}/`),
   getTodayWFHStatus: () => api.get('/attendance/wfh/today-status/'),
   // Admin Attendance Management
