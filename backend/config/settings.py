@@ -166,7 +166,7 @@ OFFICE_LONGITUDE = float(os.environ.get('OFFICE_LONGITUDE', '77.2090'))
 OFFICE_RADIUS_METERS = int(os.environ.get('OFFICE_RADIUS_METERS', '50'))
 
 # Allowed Office IPs (for IP-based validation)
-ALLOWED_OFFICE_IPS = os.environ.get('ALLOWED_OFFICE_IPS', '127.0.0.1,49.205.145.158,192.168.1.135,192.168.0.143,192.168.29.234,192.168.1.107').split(',')
+ALLOWED_OFFICE_IPS = os.environ.get('ALLOWED_OFFICE_IPS', '127.0.0.1,49.205.145.158,49.205.148.237,115.246.216.11').split(',')
 
 # Leave Settings
 ANNUAL_CASUAL_LEAVE = 12
