@@ -57,6 +57,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         related_name='employees',
         help_text="Employee's assigned shift"
     )
+    is_permanent_wfh = models.BooleanField(
+        default=False,
+        help_text="If True, employee can punch in from anywhere (Work From Home)"
+    )
     date_joined = models.DateTimeField(default=timezone.now)
 
     # Father's Contact

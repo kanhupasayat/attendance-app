@@ -7,7 +7,7 @@ from .views import (
     RegularizationApplyView, MyRegularizationListView, AllRegularizationListView,
     RegularizationReviewView, CancelRegularizationView,
     WFHApplyView, MyWFHListView, AllWFHListView, WFHReviewView,
-    CancelWFHView, TodayWFHStatusView, AutoPunchOutView,
+    CancelWFHView, TodayWFHStatusView, AutoPunchOutView, BulkWFHReviewView,
     AdminAttendanceCreateView, AdminAttendanceUpdateView,
     AdminMarkAbsentView, AdminBulkAttendanceView, AdminClearPunchOutView,
     ShiftListCreateView, ShiftDetailView, AssignShiftView,
@@ -48,6 +48,7 @@ urlpatterns = [
     path('wfh/cancel/<int:pk>/', CancelWFHView.as_view(), name='cancel-wfh'),
     path('wfh/all/', AllWFHListView.as_view(), name='all-wfh'),
     path('wfh/review/<int:pk>/', WFHReviewView.as_view(), name='review-wfh'),
+    path('wfh/bulk-review/', BulkWFHReviewView.as_view(), name='bulk-review-wfh'),
 
     # Cron job endpoint (for external cron services like cron-job.org)
     path('cron/auto-punch-out/', AutoPunchOutView.as_view(), name='auto-punch-out'),

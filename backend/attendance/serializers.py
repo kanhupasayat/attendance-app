@@ -131,8 +131,24 @@ class WFHRequestSerializer(serializers.ModelSerializer):
 
 
 class WFHApplySerializer(serializers.Serializer):
-    date = serializers.DateField()
+    start_date = serializers.DateField()
+    end_date = serializers.DateField(required=False, allow_null=True)
     reason = serializers.CharField()
+
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        if end_date and end_date < start_date:
+            raise serializers.ValidationError("End date cannot be before start date")
+
+        # Limit date range to 30 days max
+        if end_date:
+            from datetime import timedelta
+            if (end_date - start_date).days > 30:
+                raise serializers.ValidationError("WFH request cannot exceed 30 days")
+
+        return data
 
 
 class WFHReviewSerializer(serializers.Serializer):

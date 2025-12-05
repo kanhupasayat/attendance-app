@@ -53,8 +53,8 @@ class PunchInView(APIView):
         client_ip = get_client_ip(request)
         today = get_india_date()
 
-        # Check if user has approved WFH for today
-        is_wfh = WFHRequest.objects.filter(
+        # Check if user is permanent WFH or has approved WFH for today
+        is_wfh = request.user.is_permanent_wfh or WFHRequest.objects.filter(
             user=request.user,
             date=today,
             status='approved'
@@ -351,8 +351,8 @@ class PunchOutView(APIView):
         client_ip = get_client_ip(request)
         today = get_india_date()
 
-        # Check if user has approved WFH for today
-        is_wfh = WFHRequest.objects.filter(
+        # Check if user is permanent WFH or has approved WFH for today
+        is_wfh = request.user.is_permanent_wfh or WFHRequest.objects.filter(
             user=request.user,
             date=today,
             status='approved'
@@ -975,64 +975,85 @@ class CancelRegularizationView(APIView):
 
 # WFH (Work From Home) Views
 class WFHApplyView(APIView):
-    """Employee applies for Work From Home"""
+    """Employee applies for Work From Home (supports date range)"""
 
     def post(self, request):
         serializer = WFHApplySerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        date = serializer.validated_data['date']
+        start_date = serializer.validated_data['start_date']
+        end_date = serializer.validated_data.get('end_date') or start_date
         reason = serializer.validated_data['reason']
         today = get_india_date()
 
         # Cannot apply WFH for past dates
-        if date < today:
+        if start_date < today:
             return Response(
                 {"error": "WFH can only be applied for today or future dates"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check if request already exists for this date
-        existing = WFHRequest.objects.filter(
-            user=request.user,
-            date=date
-        ).first()
+        # Generate list of dates
+        from datetime import timedelta
+        dates = []
+        current_date = start_date
+        while current_date <= end_date:
+            dates.append(current_date)
+            current_date += timedelta(days=1)
 
-        if existing:
-            if existing.status == 'pending':
-                return Response(
-                    {"error": "A pending WFH request already exists for this date"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            elif existing.status == 'approved':
-                return Response(
-                    {"error": "WFH is already approved for this date"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            elif existing.status == 'rejected':
-                # Allow reapplying if previously rejected
-                existing.delete()
+        # Check for existing requests
+        existing_dates = []
+        for date in dates:
+            existing = WFHRequest.objects.filter(
+                user=request.user,
+                date=date
+            ).first()
 
-        # Create WFH request
-        wfh_request = WFHRequest.objects.create(
-            user=request.user,
-            date=date,
-            reason=reason
-        )
+            if existing:
+                if existing.status == 'pending':
+                    existing_dates.append(str(date))
+                elif existing.status == 'approved':
+                    existing_dates.append(f"{date} (approved)")
+                elif existing.status == 'rejected':
+                    # Allow reapplying if previously rejected
+                    existing.delete()
 
-        # Notify admins about new WFH request
-        notify_wfh_applied(wfh_request)
+        if existing_dates:
+            return Response(
+                {"error": f"WFH request already exists for: {', '.join(existing_dates)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create WFH requests for all dates
+        created_requests = []
+        for date in dates:
+            wfh_request = WFHRequest.objects.create(
+                user=request.user,
+                date=date,
+                reason=reason
+            )
+            created_requests.append(wfh_request)
+
+        # Notify admins about new WFH request (only once for the first request)
+        if created_requests:
+            notify_wfh_applied(created_requests[0])
 
         # Log activity
         try:
-            log_wfh_applied(request.user, wfh_request, request)
+            log_wfh_applied(request.user, created_requests[0], request)
         except Exception:
             pass
 
+        # Prepare response message
+        if len(dates) == 1:
+            msg = f"WFH request submitted for {start_date}"
+        else:
+            msg = f"WFH requests submitted for {len(dates)} days ({start_date} to {end_date})"
+
         return Response({
-            "message": "WFH request submitted successfully",
-            "data": WFHRequestSerializer(wfh_request).data
+            "message": msg,
+            "data": WFHRequestSerializer(created_requests, many=True).data
         }, status=status.HTTP_201_CREATED)
 
 
@@ -1107,6 +1128,58 @@ class WFHReviewView(APIView):
         return Response({
             "message": f"WFH request {new_status}",
             "data": WFHRequestSerializer(wfh_request).data
+        })
+
+
+class BulkWFHReviewView(APIView):
+    """Admin can approve/reject multiple WFH requests at once"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        wfh_ids = request.data.get('wfh_ids', [])
+        new_status = request.data.get('status')
+        review_remarks = request.data.get('review_remarks', '')
+
+        if not wfh_ids:
+            return Response(
+                {"error": "wfh_ids is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if new_status not in ['approved', 'rejected']:
+            return Response(
+                {"error": "status must be 'approved' or 'rejected'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get all pending WFH requests
+        wfh_requests = WFHRequest.objects.filter(
+            id__in=wfh_ids,
+            status='pending'
+        )
+
+        updated_count = 0
+        for wfh_request in wfh_requests:
+            wfh_request.status = new_status
+            wfh_request.reviewed_by = request.user
+            wfh_request.reviewed_on = timezone.now()
+            wfh_request.review_remarks = review_remarks
+            wfh_request.save()
+
+            # Notify employee
+            notify_wfh_status(wfh_request, new_status, review_remarks)
+
+            # Log activity
+            try:
+                log_wfh_reviewed(request.user, wfh_request, new_status, request)
+            except Exception:
+                pass
+
+            updated_count += 1
+
+        return Response({
+            "message": f"{updated_count} WFH request(s) {new_status}",
+            "updated_count": updated_count
         })
 
 

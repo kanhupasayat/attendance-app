@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'mobile', 'email', 'name', 'role',
             'department', 'designation', 'weekly_off', 'weekly_off_display',
-            'shift', 'shift_name',
+            'shift', 'shift_name', 'is_permanent_wfh',
             'date_joined', 'is_active', 'is_admin', 'photo_url', 'face_descriptor'
         ]
         read_only_fields = ['id', 'date_joined', 'shift']
@@ -46,7 +46,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'mobile', 'email', 'name', 'photo', 'photo_url', 'role',
             'department', 'designation', 'weekly_off', 'weekly_off_display',
-            'shift', 'shift_name',
+            'shift', 'shift_name', 'is_permanent_wfh',
             'date_joined', 'is_active', 'is_admin',
             # Family
             'father_name', 'father_phone',
