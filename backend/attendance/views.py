@@ -1957,7 +1957,7 @@ class UseCompOffToReduceLOPView(APIView):
             # Mark original as used with reduced days
             comp_off.credit_days = actual_reduction
             comp_off.status = 'used'
-            comp_off.used_on = today
+            comp_off.used_date = today
             comp_off.save()
 
             # Create new comp off for remaining days
@@ -1972,7 +1972,7 @@ class UseCompOffToReduceLOPView(APIView):
         else:
             # Use entire comp off
             comp_off.status = 'used'
-            comp_off.used_on = today
+            comp_off.used_date = today
             comp_off.save()
 
         # Update leave request - reduce LOP, increase comp_off_days

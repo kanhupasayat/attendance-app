@@ -1,7 +1,11 @@
 """
 Utility functions for logging activities
 """
+import pytz
 from .models import ActivityLog
+
+# IST timezone for time formatting
+IST = pytz.timezone('Asia/Kolkata')
 
 
 def get_client_ip(request):
@@ -65,12 +69,14 @@ def log_activity(
 
 def log_punch_in(user, attendance, request=None):
     """Log punch in activity"""
+    # Convert to IST for display
+    punch_in_ist = attendance.punch_in.astimezone(IST)
     return log_activity(
         actor=user,
         activity_type='punch_in',
         category='attendance',
         title=f'{user.name} punched in',
-        description=f'Punch in at {attendance.punch_in.strftime("%I:%M %p")}',
+        description=f'Punch in at {punch_in_ist.strftime("%I:%M %p")}',
         related_model='Attendance',
         related_id=attendance.id,
         request=request
@@ -79,12 +85,14 @@ def log_punch_in(user, attendance, request=None):
 
 def log_punch_out(user, attendance, request=None):
     """Log punch out activity"""
+    # Convert to IST for display
+    punch_out_ist = attendance.punch_out.astimezone(IST)
     return log_activity(
         actor=user,
         activity_type='punch_out',
         category='attendance',
         title=f'{user.name} punched out',
-        description=f'Punch out at {attendance.punch_out.strftime("%I:%M %p")} - {attendance.working_hours} hrs',
+        description=f'Punch out at {punch_out_ist.strftime("%I:%M %p")} - {attendance.working_hours} hrs',
         related_model='Attendance',
         related_id=attendance.id,
         request=request
