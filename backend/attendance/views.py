@@ -1244,59 +1244,68 @@ class AutoPunchOutView(APIView):
         return self._process_auto_punch_out(request)
 
     def _process_auto_punch_out(self, request):
-        from .email_utils import send_auto_punch_out_email
-        from datetime import datetime as dt
-        import pytz
+        try:
+            from .email_utils import send_auto_punch_out_email
+            from datetime import datetime, timedelta
+            import pytz
 
-        today = get_india_date()
-        now = timezone.now()
-        ist = pytz.timezone('Asia/Kolkata')
+            today = get_india_date()
+            now = timezone.now()
+            ist = pytz.timezone('Asia/Kolkata')
 
-        # Find ALL attendance records with punch_in but no punch_out (not just today)
-        pending_punch_outs = Attendance.objects.filter(
-            punch_in__isnull=False,
-            punch_out__isnull=True
-        ).select_related('user')
+            # Find ALL attendance records with punch_in but no punch_out (not just today)
+            pending_punch_outs = Attendance.objects.filter(
+                punch_in__isnull=False,
+                punch_out__isnull=True
+            ).select_related('user')
 
-        count = 0
-        punched_out_users = []
+            count = 0
+            punched_out_users = []
 
-        for attendance in pending_punch_outs:
-            # Set punch out time based on the attendance date
-            if attendance.date == today:
-                # Today's record - punch out at current time
-                punch_out_time = now
-            else:
-                # Previous day's record - punch out at 11 PM of that day
-                attendance_date = attendance.date
-                punch_out_time = ist.localize(
-                    dt(
-                        attendance_date.year,
-                        attendance_date.month,
-                        attendance_date.day,
-                        23, 0, 0  # 11:00 PM
-                    )
-                )
+            for attendance in pending_punch_outs:
+                try:
+                    # Set punch out time based on the attendance date
+                    if attendance.date == today:
+                        # Today's record - punch out at current time
+                        punch_out_time = now
+                    else:
+                        # Previous day's record - punch out at 11 PM of that day
+                        naive_dt = datetime(
+                            attendance.date.year,
+                            attendance.date.month,
+                            attendance.date.day,
+                            23, 0, 0
+                        )
+                        punch_out_time = ist.localize(naive_dt)
 
-            attendance.punch_out = punch_out_time
-            attendance.is_auto_punch_out = True
-            attendance.notes = f"Auto punch out by system. Employee forgot to punch out."
-            attendance.save()
+                    attendance.punch_out = punch_out_time
+                    attendance.is_auto_punch_out = True
+                    attendance.notes = f"Auto punch out by system. Employee forgot to punch out."
+                    attendance.save()
 
-            punched_out_users.append(attendance.user.name)
+                    punched_out_users.append(attendance.user.name)
+                    count += 1
 
-            # Send warning email to employee
-            try:
-                send_auto_punch_out_email(attendance)
-            except Exception as e:
-                print(f"Failed to send email to {attendance.user.name}: {e}")
+                    # Send warning email to employee
+                    try:
+                        send_auto_punch_out_email(attendance)
+                    except Exception as e:
+                        print(f"Failed to send email to {attendance.user.name}: {e}")
 
-            count += 1
+                except Exception as e:
+                    print(f"Error processing attendance {attendance.id}: {e}")
+                    continue
 
-        return Response({
-            "message": f"Auto punch out completed for {count} employee(s)",
-            "employees": punched_out_users
-        })
+            return Response({
+                "message": f"Auto punch out completed for {count} employee(s)",
+                "employees": punched_out_users
+            })
+
+        except Exception as e:
+            return Response({
+                "error": str(e),
+                "message": "Auto punch out failed"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # Admin Attendance Management Views
