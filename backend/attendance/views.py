@@ -914,17 +914,17 @@ class RegularizationReviewView(APIView):
                 defaults={'status': 'present'}
             )
 
-            # Update attendance based on request type
+            # Update attendance based on request type (use IST timezone)
+            ist = pytz.timezone('Asia/Kolkata')
+
             if regularization.requested_punch_in:
-                punch_in_datetime = timezone.make_aware(
-                    datetime.combine(regularization.date, regularization.requested_punch_in)
-                )
+                naive_punch_in = datetime.combine(regularization.date, regularization.requested_punch_in)
+                punch_in_datetime = ist.localize(naive_punch_in)
                 attendance.punch_in = punch_in_datetime
 
             if regularization.requested_punch_out:
-                punch_out_datetime = timezone.make_aware(
-                    datetime.combine(regularization.date, regularization.requested_punch_out)
-                )
+                naive_punch_out = datetime.combine(regularization.date, regularization.requested_punch_out)
+                punch_out_datetime = ist.localize(naive_punch_out)
                 attendance.punch_out = punch_out_datetime
 
             # Reset auto punch-out flag since this is now regularized
