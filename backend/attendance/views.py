@@ -1244,22 +1244,7 @@ class AutoPunchOutView(APIView):
         return self._process_auto_punch_out(request)
 
     def _process_auto_punch_out(self, request):
-        from django.conf import settings
         from .email_utils import send_auto_punch_out_email
-
-        # Verify secret key (supports header, body, or query param)
-        secret_key = (
-            request.headers.get('X-Cron-Secret') or
-            request.data.get('secret_key') or
-            request.query_params.get('secret_key')
-        )
-        expected_key = getattr(settings, 'CRON_SECRET_KEY', 'attendance-auto-punch-2024')
-
-        if secret_key != expected_key:
-            return Response(
-                {"error": "Unauthorized"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
 
         today = get_india_date()
         now = timezone.now()
