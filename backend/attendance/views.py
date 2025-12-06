@@ -1264,26 +1264,19 @@ class AutoPunchOutView(APIView):
 
             for attendance in pending_punch_outs:
                 try:
-                    # Set punch out time based on the attendance date
-                    if attendance.date == today:
-                        # Today's record - punch out at current time
-                        punch_out_time = now
-                    else:
-                        # Previous day's record - punch out at 11 PM of that day
-                        naive_dt = datetime(
-                            attendance.date.year,
-                            attendance.date.month,
-                            attendance.date.day,
-                            23, 0, 0
-                        )
-                        punch_out_time = ist.localize(naive_dt)
+                    # HALF DAY DEFAULT: Set punch_out = punch_in + 5 hours (4 hours work + 1 hour break)
+                    # This credits only 4 hours (half day) when employee forgets to punch out
+                    # Employee can apply for regularization if they actually worked full day
+                    punch_out_time = attendance.punch_in + timedelta(hours=5)
 
                     attendance.punch_out = punch_out_time
                     attendance.is_auto_punch_out = True
-                    attendance.notes = f"Auto punch out by system. Employee forgot to punch out."
-                    attendance.save()
+                    attendance.status = 'half_day'  # Force half day status
+                    attendance.working_hours = 4.0  # 4 hours (half day)
+                    attendance.notes = f"Auto punch out: Half day (4 hrs) credited. Employee forgot to punch out. Apply regularization for full day."
+                    attendance.save(force_status=True)  # Prevent auto status calculation
 
-                    punched_out_users.append(attendance.user.name)
+                    punched_out_users.append(f"{attendance.user.name} ({attendance.date})")
                     count += 1
 
                     # Send warning email to employee
@@ -1297,8 +1290,9 @@ class AutoPunchOutView(APIView):
                     continue
 
             return Response({
-                "message": f"Auto punch out completed for {count} employee(s)",
-                "employees": punched_out_users
+                "message": f"Auto punch out completed for {count} employee(s). Half day (4 hours) credited by default.",
+                "employees": punched_out_users,
+                "note": "Employees can apply for regularization to get full day credit."
             })
 
         except Exception as e:
