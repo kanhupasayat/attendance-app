@@ -1245,7 +1245,7 @@ class AutoPunchOutView(APIView):
 
     def _process_auto_punch_out(self, request):
         from .email_utils import send_auto_punch_out_email
-        from datetime import timedelta
+        from datetime import datetime as dt
         import pytz
 
         today = get_india_date()
@@ -1270,7 +1270,7 @@ class AutoPunchOutView(APIView):
                 # Previous day's record - punch out at 11 PM of that day
                 attendance_date = attendance.date
                 punch_out_time = ist.localize(
-                    timezone.datetime(
+                    dt(
                         attendance_date.year,
                         attendance_date.month,
                         attendance_date.day,
