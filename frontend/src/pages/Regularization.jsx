@@ -100,7 +100,13 @@ const Regularization = () => {
   const handleApply = async (e) => {
     e.preventDefault();
     try {
-      await attendanceAPI.applyRegularization(formData);
+      // Convert empty strings to null for time fields
+      const dataToSend = {
+        ...formData,
+        requested_punch_in: formData.requested_punch_in || null,
+        requested_punch_out: formData.requested_punch_out || null,
+      };
+      await attendanceAPI.applyRegularization(dataToSend);
       toast.success('Regularization request submitted!');
       setShowApplyModal(false);
       setExistingAttendance(null);
