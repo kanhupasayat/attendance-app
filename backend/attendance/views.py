@@ -914,6 +914,15 @@ class RegularizationReviewView(APIView):
                 defaults={'status': 'present'}
             )
 
+            # DEBUG: Print what's being updated
+            print(f"=== REGULARIZATION DEBUG ===")
+            print(f"User: {regularization.user.name}")
+            print(f"Date: {regularization.date}")
+            print(f"Requested Punch In: {regularization.requested_punch_in}")
+            print(f"Requested Punch Out: {regularization.requested_punch_out}")
+            print(f"Attendance ID: {attendance.id}, Created: {created}")
+            print(f"Before - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
+
             # Update attendance based on request type (use IST timezone)
             ist = pytz.timezone('Asia/Kolkata')
 
@@ -921,11 +930,13 @@ class RegularizationReviewView(APIView):
                 naive_punch_in = datetime.combine(regularization.date, regularization.requested_punch_in)
                 punch_in_datetime = ist.localize(naive_punch_in)
                 attendance.punch_in = punch_in_datetime
+                print(f"Setting punch_in to: {punch_in_datetime}")
 
             if regularization.requested_punch_out:
                 naive_punch_out = datetime.combine(regularization.date, regularization.requested_punch_out)
                 punch_out_datetime = ist.localize(naive_punch_out)
                 attendance.punch_out = punch_out_datetime
+                print(f"Setting punch_out to: {punch_out_datetime}")
 
             # Reset auto punch-out flag since this is now regularized
             if attendance.is_auto_punch_out:
@@ -939,6 +950,11 @@ class RegularizationReviewView(APIView):
             attendance.status = 'present'
             attendance.notes = f"Regularized: {regularization.request_type}"
             attendance.save(force_status=True)  # Prevent auto-status calculation
+
+            # DEBUG: Print after save
+            print(f"After Save - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
+            print(f"Working Hours: {attendance.working_hours}, Status: {attendance.status}")
+            print(f"=== END DEBUG ===")
 
         # Notify employee about regularization status (with email)
         notify_regularization_status(regularization, new_status, review_remarks)
