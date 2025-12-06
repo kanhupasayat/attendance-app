@@ -1229,11 +1229,11 @@ class TodayWFHStatusView(APIView):
 class AutoPunchOutView(APIView):
     """
     API endpoint to trigger auto punch-out for all employees who forgot to punch out.
-    Secured with CRON_SECRET_KEY.
     Can be called by external cron services like cron-job.org
     Supports both GET and POST methods for compatibility.
     """
-    permission_classes = [permissions.AllowAny]
+    authentication_classes = []  # No authentication required
+    permission_classes = [permissions.AllowAny]  # Allow any request
 
     def get(self, request):
         """Handle GET request - same as POST for cron compatibility"""
