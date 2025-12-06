@@ -18,6 +18,7 @@ const Attendance = () => {
 
   // Export states
   const [exporting, setExporting] = useState(false);
+  const [fixingAutoPunch, setFixingAutoPunch] = useState(false);
 
   // Admin modal states
   const [showModal, setShowModal] = useState(false);
@@ -217,6 +218,23 @@ const Attendance = () => {
     }
   };
 
+  const handleFixAutoPunchOut = async () => {
+    if (!confirm('Fix all auto punch-out records?\n\nThis will convert 11 PM auto punch-outs to Half Day (4 hours).')) {
+      return;
+    }
+
+    setFixingAutoPunch(true);
+    try {
+      const response = await attendanceAPI.fixAutoPunchOut();
+      toast.success(response.data?.message || 'Auto punch-out records fixed!');
+      fetchAttendance();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to fix auto punch-out records');
+    } finally {
+      setFixingAutoPunch(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -303,6 +321,18 @@ const Attendance = () => {
               {/* Export Buttons (Admin Only) */}
               {isAdmin && (
                 <div className="flex gap-2 ml-auto">
+                  {/* Fix Auto Punch-Out Button */}
+                  <button
+                    onClick={handleFixAutoPunchOut}
+                    disabled={fixingAutoPunch}
+                    className="flex items-center gap-1.5 bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+                    title="Fix 11 PM auto punch-outs to Half Day"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {fixingAutoPunch ? 'Fixing...' : 'Fix Auto Punch'}
+                  </button>
                   <div className="relative group">
                     <button
                       onClick={() => {}}
