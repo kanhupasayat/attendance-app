@@ -13,7 +13,7 @@ from .views import (
     ShiftListCreateView, ShiftDetailView, AssignShiftView,
     MyCompOffListView, AllCompOffListView, CompOffBalanceView,
     UseCompOffView, AdminCreateCompOffView, UseCompOffToReduceLOPView,
-    UseCompOffToCoverAbsentView
+    UseCompOffToCoverAbsentView, FixAutoPunchOutView
 )
 
 urlpatterns = [
@@ -53,6 +53,7 @@ urlpatterns = [
 
     # Cron job endpoint (for external cron services like cron-job.org)
     path('cron/auto-punch-out/', AutoPunchOutView.as_view(), name='auto-punch-out'),
+    path('admin/fix-auto-punch-out/', FixAutoPunchOutView.as_view(), name='fix-auto-punch-out'),
 
     # Admin attendance management
     path('admin/add/', AdminAttendanceCreateView.as_view(), name='admin-attendance-add'),

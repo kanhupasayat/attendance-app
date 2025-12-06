@@ -1302,6 +1302,30 @@ class AutoPunchOutView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class FixAutoPunchOutView(APIView):
+    """Fix existing auto punch-out records (11 PM) to half day (4 hours)"""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from datetime import timedelta
+
+        auto_records = Attendance.objects.filter(is_auto_punch_out=True)
+        fixed_count = 0
+
+        for att in auto_records:
+            if att.punch_in:
+                att.punch_out = att.punch_in + timedelta(hours=5)
+                att.status = 'half_day'
+                att.working_hours = 4.0
+                att.notes = "Auto punch out: Half day (4 hrs) credited."
+                att.save(force_status=True)
+                fixed_count += 1
+
+        return Response({
+            "message": f"Fixed {fixed_count} auto punch-out record(s) to half day"
+        })
+
+
 # Admin Attendance Management Views
 class AdminAttendanceCreateView(APIView):
     """Admin can add attendance for any employee"""
