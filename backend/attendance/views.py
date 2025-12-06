@@ -957,7 +957,11 @@ class RegularizationReviewView(APIView):
             print(f"=== END DEBUG ===")
 
         # Notify employee about regularization status (with email)
-        notify_regularization_status(regularization, new_status, review_remarks)
+        # Wrapped in try-except to prevent timeout crashes
+        try:
+            notify_regularization_status(regularization, new_status, review_remarks)
+        except Exception as e:
+            print(f"Email notification failed: {e}")
 
         # Log activity
         try:
