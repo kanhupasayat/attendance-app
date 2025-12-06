@@ -1245,23 +1245,40 @@ class AutoPunchOutView(APIView):
 
     def _process_auto_punch_out(self, request):
         from .email_utils import send_auto_punch_out_email
+        from datetime import timedelta
+        import pytz
 
         today = get_india_date()
         now = timezone.now()
+        ist = pytz.timezone('Asia/Kolkata')
 
-        # Find all attendance records with punch_in but no punch_out
+        # Find ALL attendance records with punch_in but no punch_out (not just today)
         pending_punch_outs = Attendance.objects.filter(
-            date=today,
             punch_in__isnull=False,
             punch_out__isnull=True
-        )
+        ).select_related('user')
 
         count = 0
         punched_out_users = []
 
         for attendance in pending_punch_outs:
-            # Auto punch out at current time
-            attendance.punch_out = now
+            # Set punch out time based on the attendance date
+            if attendance.date == today:
+                # Today's record - punch out at current time
+                punch_out_time = now
+            else:
+                # Previous day's record - punch out at 11 PM of that day
+                attendance_date = attendance.date
+                punch_out_time = ist.localize(
+                    timezone.datetime(
+                        attendance_date.year,
+                        attendance_date.month,
+                        attendance_date.day,
+                        23, 0, 0  # 11:00 PM
+                    )
+                )
+
+            attendance.punch_out = punch_out_time
             attendance.is_auto_punch_out = True
             attendance.notes = f"Auto punch out by system. Employee forgot to punch out."
             attendance.save()
