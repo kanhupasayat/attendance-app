@@ -258,6 +258,12 @@ export const attendanceAPI = {
     clearCache();
     return api.post('/attendance/comp-off/reduce-lop/', data);
   },
+  // Cover Absent using Comp Off
+  getCoverAbsentOptions: () => api.get('/attendance/comp-off/cover-absent/'),
+  useCompOffToCoverAbsent: (data) => {
+    clearCache();
+    return api.post('/attendance/comp-off/cover-absent/', data);
+  },
 };
 
 // Leave APIs

@@ -29,6 +29,12 @@ const CompOff = () => {
   });
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
+  // Cover Absent states
+  const [showCoverAbsentModal, setShowCoverAbsentModal] = useState(false);
+  const [coverAbsentData, setCoverAbsentData] = useState({ available_comp_offs: [], absent_days: [] });
+  const [selectedAbsentDay, setSelectedAbsentDay] = useState(null);
+  const [selectedCompOffForAbsent, setSelectedCompOffForAbsent] = useState('');
+  const [coverAbsentLoading, setCoverAbsentLoading] = useState(false);
 
   const fetchCompOffs = async () => {
     try {
@@ -160,6 +166,46 @@ const CompOff = () => {
     }
   };
 
+  // Cover Absent Functions
+  const fetchCoverAbsentOptions = async () => {
+    setCoverAbsentLoading(true);
+    try {
+      const response = await attendanceAPI.getCoverAbsentOptions();
+      setCoverAbsentData(response.data);
+    } catch (error) {
+      console.error('Error fetching absent options:', error);
+      toast.error(error.response?.data?.error || 'Failed to fetch absent days');
+    } finally {
+      setCoverAbsentLoading(false);
+    }
+  };
+
+  const handleOpenCoverAbsentModal = () => {
+    setShowCoverAbsentModal(true);
+    fetchCoverAbsentOptions();
+  };
+
+  const handleCoverAbsent = async () => {
+    if (!selectedAbsentDay || !selectedCompOffForAbsent) {
+      toast.error('Please select both an absent day and a Comp Off');
+      return;
+    }
+    try {
+      const response = await attendanceAPI.useCompOffToCoverAbsent({
+        attendance_id: selectedAbsentDay.id,
+        comp_off_id: parseInt(selectedCompOffForAbsent),
+      });
+      toast.success(response.data.message || 'Absent covered successfully!');
+      setShowCoverAbsentModal(false);
+      setSelectedAbsentDay(null);
+      setSelectedCompOffForAbsent('');
+      fetchCompOffs();
+      fetchBalance();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to cover absent');
+    }
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       earned: 'bg-green-100 text-green-800',
@@ -200,14 +246,22 @@ const CompOff = () => {
                 Earn comp off by working on holidays or weekly off days
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {!isAdmin && (
-                <button
-                  onClick={handleOpenReduceLOPModal}
-                  className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                >
-                  Reduce LOP
-                </button>
+                <>
+                  <button
+                    onClick={handleOpenReduceLOPModal}
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                  >
+                    Reduce LOP
+                  </button>
+                  <button
+                    onClick={handleOpenCoverAbsentModal}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                  >
+                    Cover Absent
+                  </button>
+                </>
               )}
               {isAdmin && (
                 <button
@@ -435,6 +489,10 @@ const CompOff = () => {
             <li className="flex items-start">
               <span className="mr-2">4.</span>
               <span>Use "Reduce LOP" to convert your LOP days using comp off</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">5.</span>
+              <span>Use "Cover Absent" to convert your absent days to present using comp off</span>
             </li>
           </ul>
         </div>
@@ -704,6 +762,128 @@ const CompOff = () => {
                         className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
                         Reduce LOP
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Cover Absent Modal */}
+        {showCoverAbsentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <h2 className="text-lg sm:text-xl font-bold mb-4">Use Comp Off to Cover Absent</h2>
+
+              {coverAbsentLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+              ) : (
+                <>
+                  {coverAbsentData.absent_days.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-gray-500">No absent days found.</p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        You don't have any absent days in the last 60 days.
+                      </p>
+                    </div>
+                  ) : coverAbsentData.available_comp_offs.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-gray-500">No available Comp Offs to use.</p>
+                      <p className="text-sm text-gray-400 mt-2">
+                        You need earned comp offs to cover absent days.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Absent Days List */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Absent Day to Cover
+                        </label>
+                        <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
+                          {coverAbsentData.absent_days.map((absent) => (
+                            <div
+                              key={absent.id}
+                              onClick={() => setSelectedAbsentDay(absent)}
+                              className={`p-3 rounded-lg cursor-pointer border-2 transition-colors ${
+                                selectedAbsentDay?.id === absent.id
+                                  ? 'border-purple-500 bg-purple-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <p className="font-medium text-sm">
+                                  {formatDate(absent.date)}
+                                </p>
+                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium">
+                                  Absent
+                                </span>
+                              </div>
+                              {absent.notes && (
+                                <p className="text-xs text-gray-500 mt-1 truncate">{absent.notes}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Comp Off Selection */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Comp Off to Use
+                        </label>
+                        <select
+                          value={selectedCompOffForAbsent}
+                          onChange={(e) => setSelectedCompOffForAbsent(e.target.value)}
+                          className="w-full border rounded-lg px-3 py-2.5 sm:py-2 text-base"
+                        >
+                          <option value="">Select Comp Off</option>
+                          {coverAbsentData.available_comp_offs.map((compOff) => (
+                            <option key={compOff.id} value={compOff.id}>
+                              {formatDate(compOff.earned_date)} - {compOff.credit_days} day(s)
+                              {compOff.reason ? ` (${compOff.reason})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Info */}
+                      {selectedAbsentDay && selectedCompOffForAbsent && (
+                        <div className="mb-4 p-3 bg-purple-50 rounded-lg">
+                          <p className="text-sm text-purple-800">
+                            This will use your selected comp off to cover the absent on{' '}
+                            <strong>{formatDate(selectedAbsentDay.date)}</strong>.
+                            The attendance status will change from Absent to Present.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:space-x-4 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCoverAbsentModal(false);
+                        setSelectedAbsentDay(null);
+                        setSelectedCompOffForAbsent('');
+                      }}
+                      className="w-full sm:w-auto px-4 py-2.5 sm:py-2 border rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    {coverAbsentData.absent_days.length > 0 && coverAbsentData.available_comp_offs.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleCoverAbsent}
+                        disabled={!selectedAbsentDay || !selectedCompOffForAbsent}
+                        className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        Cover Absent
                       </button>
                     )}
                   </div>
