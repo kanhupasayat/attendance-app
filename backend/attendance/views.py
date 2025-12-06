@@ -927,6 +927,14 @@ class RegularizationReviewView(APIView):
                 )
                 attendance.punch_out = punch_out_datetime
 
+            # Reset auto punch-out flag since this is now regularized
+            if attendance.is_auto_punch_out:
+                attendance.is_auto_punch_out = False
+
+            # Recalculate working hours with new punch times
+            if attendance.punch_in and attendance.punch_out:
+                attendance.calculate_working_hours()
+
             # Always set status to present when regularization is approved
             attendance.status = 'present'
             attendance.notes = f"Regularized: {regularization.request_type}"
