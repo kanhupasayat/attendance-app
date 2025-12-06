@@ -1231,15 +1231,28 @@ class AutoPunchOutView(APIView):
     API endpoint to trigger auto punch-out for all employees who forgot to punch out.
     Secured with CRON_SECRET_KEY.
     Can be called by external cron services like cron-job.org
+    Supports both GET and POST methods for compatibility.
     """
     permission_classes = [permissions.AllowAny]
 
+    def get(self, request):
+        """Handle GET request - same as POST for cron compatibility"""
+        return self._process_auto_punch_out(request)
+
     def post(self, request):
+        """Handle POST request"""
+        return self._process_auto_punch_out(request)
+
+    def _process_auto_punch_out(self, request):
         from django.conf import settings
         from .email_utils import send_auto_punch_out_email
 
-        # Verify secret key
-        secret_key = request.headers.get('X-Cron-Secret') or request.data.get('secret_key')
+        # Verify secret key (supports header, body, or query param)
+        secret_key = (
+            request.headers.get('X-Cron-Secret') or
+            request.data.get('secret_key') or
+            request.query_params.get('secret_key')
+        )
         expected_key = getattr(settings, 'CRON_SECRET_KEY', 'attendance-auto-punch-2024')
 
         if secret_key != expected_key:
