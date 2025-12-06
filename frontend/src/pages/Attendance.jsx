@@ -450,8 +450,18 @@ const Attendance = () => {
                         )}
                         <p className="text-gray-600 text-xs">{formatDate(record.date)}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {getStatusBadge(record.status, true)}
+                        {record.is_comp_off_used && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            Comp-Off
+                          </span>
+                        )}
+                        {record.is_wfh && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            WFH
+                          </span>
+                        )}
                         {isAdmin && (
                           <button
                             onClick={() => openEditModal(record)}
@@ -582,7 +592,19 @@ const Attendance = () => {
                           {record.working_hours || '-'}
                         </td>
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(record.status)}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {getStatusBadge(record.status)}
+                            {record.is_comp_off_used && (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                Comp-Off
+                              </span>
+                            )}
+                            {record.is_wfh && (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                WFH
+                              </span>
+                            )}
+                          </div>
                         </td>
                         {isAdmin && (
                           <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm">

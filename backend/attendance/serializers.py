@@ -12,6 +12,7 @@ class UserLightSerializer(serializers.Serializer):
 
 class AttendanceSerializer(serializers.ModelSerializer):
     user_details = UserLightSerializer(source='user', read_only=True)
+    is_comp_off_used = serializers.SerializerMethodField()
 
     class Meta:
         model = Attendance
@@ -19,12 +20,16 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'id', 'user', 'user_details', 'date',
             'punch_in', 'punch_out',
             'status', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out',
-            'face_verified', 'notes', 'created_at'
+            'face_verified', 'notes', 'is_comp_off_used', 'created_at'
         ]
         read_only_fields = [
             'id', 'working_hours', 'is_off_day', 'is_wfh', 'is_auto_punch_out',
-            'face_verified', 'created_at'
+            'face_verified', 'is_comp_off_used', 'created_at'
         ]
+
+    def get_is_comp_off_used(self, obj):
+        """Check if comp-off was used to cover this attendance"""
+        return obj.notes and '[Comp-Off Used' in obj.notes
 
 
 # Full serializer with all fields - use only when needed

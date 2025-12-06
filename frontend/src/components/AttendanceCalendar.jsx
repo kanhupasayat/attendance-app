@@ -111,9 +111,18 @@ const AttendanceCalendar = () => {
           {/* WFH indicator */}
           {record?.is_wfh && (
             <div className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1" title="Work From Home">
-              <span className="text-[8px] sm:text-[10px] bg-purple-500 text-white px-1 rounded">
+              <span className="text-[8px] sm:text-[10px] bg-indigo-500 text-white px-1 rounded">
                 <span className="hidden sm:inline">WFH</span>
                 <span className="sm:hidden">🏠</span>
+              </span>
+            </div>
+          )}
+          {/* Comp-Off indicator */}
+          {record?.is_comp_off_used && (
+            <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1" title="Comp-Off Used">
+              <span className="text-[8px] sm:text-[10px] bg-purple-500 text-white px-1 rounded">
+                <span className="hidden sm:inline">CO</span>
+                <span className="sm:hidden">🎁</span>
               </span>
             </div>
           )}
@@ -241,8 +250,12 @@ const AttendanceCalendar = () => {
           <span>Leave/Holiday</span>
         </div>
         <div className="flex items-center">
-          <div className="w-4 h-4 bg-purple-500 rounded mr-2"></div>
+          <div className="w-4 h-4 bg-indigo-500 rounded mr-2"></div>
           <span>WFH</span>
+        </div>
+        <div className="flex items-center">
+          <div className="w-4 h-4 bg-purple-500 rounded mr-2"></div>
+          <span>Comp-Off</span>
         </div>
       </div>
       {/* Mobile Legend */}
@@ -251,7 +264,8 @@ const AttendanceCalendar = () => {
         <span className="bg-red-100 px-2 py-1 rounded">A=Absent</span>
         <span className="bg-yellow-100 px-2 py-1 rounded">HD=Half</span>
         <span className="bg-blue-100 px-2 py-1 rounded">L=Leave</span>
-        <span className="bg-purple-500 text-white px-2 py-1 rounded">🏠=WFH</span>
+        <span className="bg-indigo-500 text-white px-2 py-1 rounded">🏠=WFH</span>
+        <span className="bg-purple-500 text-white px-2 py-1 rounded">🎁=CO</span>
       </div>
 
       {loading ? (
