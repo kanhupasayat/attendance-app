@@ -771,6 +771,32 @@ class RegularizationApplyView(APIView):
         requested_punch_out = serializer.validated_data.get('requested_punch_out')
         reason = serializer.validated_data['reason']
 
+        # VALIDATION: Punch out must be after punch in
+        if requested_punch_in and requested_punch_out:
+            if requested_punch_out <= requested_punch_in:
+                return Response(
+                    {"error": f"Punch out time ({requested_punch_out.strftime('%I:%M %p')}) must be after punch in time ({requested_punch_in.strftime('%I:%M %p')}). Please check your times."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # VALIDATION: Punch in should be reasonable (6 AM to 2 PM)
+        if requested_punch_in:
+            from datetime import time
+            if requested_punch_in < time(6, 0) or requested_punch_in > time(14, 0):
+                return Response(
+                    {"error": f"Punch in time ({requested_punch_in.strftime('%I:%M %p')}) seems incorrect. Expected between 6:00 AM and 2:00 PM."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # VALIDATION: Punch out should be reasonable (3 PM to 11 PM)
+        if requested_punch_out:
+            from datetime import time
+            if requested_punch_out < time(15, 0) or requested_punch_out > time(23, 0):
+                return Response(
+                    {"error": f"Punch out time ({requested_punch_out.strftime('%I:%M %p')}) seems incorrect. Expected between 3:00 PM and 11:00 PM."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         # Cannot apply regularization for future dates (today is allowed)
         today = get_india_date()
         if date > today:
