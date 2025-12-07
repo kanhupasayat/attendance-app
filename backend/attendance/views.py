@@ -1002,11 +1002,11 @@ class RegularizationReviewView(APIView):
         # except Exception as e:
         #     print(f"Email notification failed: {e}")
 
-        # Log activity (DISABLED - causing timeout)
-        # try:
-        #     log_regularization_reviewed(request.user, regularization, new_status, request)
-        # except Exception:
-        #     pass
+        # Log activity (re-enabled after fixing signal issue)
+        try:
+            log_regularization_reviewed(request.user, regularization, new_status, request)
+        except Exception:
+            pass
 
         return Response({
             "message": f"Regularization request {new_status}",
