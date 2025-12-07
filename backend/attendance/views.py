@@ -934,53 +934,67 @@ class RegularizationReviewView(APIView):
 
         # If approved, update the attendance record
         if new_status == 'approved':
-            attendance, created = Attendance.objects.get_or_create(
-                user=regularization.user,
-                date=regularization.date,
-                defaults={'status': 'present'}
-            )
+            try:
+                attendance, created = Attendance.objects.get_or_create(
+                    user=regularization.user,
+                    date=regularization.date,
+                    defaults={'status': 'present'}
+                )
 
-            # DEBUG: Print what's being updated
-            print(f"=== REGULARIZATION DEBUG ===")
-            print(f"User: {regularization.user.name}")
-            print(f"Date: {regularization.date}")
-            print(f"Requested Punch In: {regularization.requested_punch_in}")
-            print(f"Requested Punch Out: {regularization.requested_punch_out}")
-            print(f"Attendance ID: {attendance.id}, Created: {created}")
-            print(f"Before - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
+                # DEBUG: Print what's being updated
+                print(f"=== REGULARIZATION DEBUG ===")
+                print(f"User: {regularization.user.name}")
+                print(f"Date: {regularization.date}")
+                print(f"Requested Punch In: {regularization.requested_punch_in}")
+                print(f"Requested Punch Out: {regularization.requested_punch_out}")
+                print(f"Attendance ID: {attendance.id}, Created: {created}")
+                print(f"Before - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
 
-            # Update attendance based on request type (use IST timezone)
-            ist = pytz.timezone('Asia/Kolkata')
+                # Update attendance based on request type (use IST timezone)
+                ist = pytz.timezone('Asia/Kolkata')
 
-            if regularization.requested_punch_in:
-                naive_punch_in = datetime.combine(regularization.date, regularization.requested_punch_in)
-                punch_in_datetime = ist.localize(naive_punch_in)
-                attendance.punch_in = punch_in_datetime
-                print(f"Setting punch_in to: {punch_in_datetime}")
+                if regularization.requested_punch_in:
+                    naive_punch_in = datetime.combine(regularization.date, regularization.requested_punch_in)
+                    punch_in_datetime = ist.localize(naive_punch_in)
+                    attendance.punch_in = punch_in_datetime
+                    print(f"Setting punch_in to: {punch_in_datetime}")
 
-            if regularization.requested_punch_out:
-                naive_punch_out = datetime.combine(regularization.date, regularization.requested_punch_out)
-                punch_out_datetime = ist.localize(naive_punch_out)
-                attendance.punch_out = punch_out_datetime
-                print(f"Setting punch_out to: {punch_out_datetime}")
+                if regularization.requested_punch_out:
+                    naive_punch_out = datetime.combine(regularization.date, regularization.requested_punch_out)
+                    punch_out_datetime = ist.localize(naive_punch_out)
+                    attendance.punch_out = punch_out_datetime
+                    print(f"Setting punch_out to: {punch_out_datetime}")
 
-            # Reset auto punch-out flag since this is now regularized
-            if attendance.is_auto_punch_out:
-                attendance.is_auto_punch_out = False
+                # Reset auto punch-out flag since this is now regularized
+                if attendance.is_auto_punch_out:
+                    attendance.is_auto_punch_out = False
 
-            # Recalculate working hours with new punch times
-            if attendance.punch_in and attendance.punch_out:
-                attendance.calculate_working_hours()
+                # Recalculate working hours with new punch times
+                if attendance.punch_in and attendance.punch_out:
+                    attendance.calculate_working_hours()
 
-            # Always set status to present when regularization is approved
-            attendance.status = 'present'
-            attendance.notes = f"Regularized: {regularization.request_type}"
-            attendance.save(force_status=True)  # Prevent auto-status calculation
+                # Always set status to present when regularization is approved
+                attendance.status = 'present'
+                attendance.notes = f"Regularized: {regularization.request_type}"
+                attendance.save(force_status=True)  # Prevent auto-status calculation
 
-            # DEBUG: Print after save
-            print(f"After Save - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
-            print(f"Working Hours: {attendance.working_hours}, Status: {attendance.status}")
-            print(f"=== END DEBUG ===")
+                # DEBUG: Print after save
+                print(f"After Save - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
+                print(f"Working Hours: {attendance.working_hours}, Status: {attendance.status}")
+                print(f"=== END DEBUG ===")
+
+                # Verify from database
+                attendance.refresh_from_db()
+                print(f"After DB Refresh - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
+
+            except Exception as e:
+                print(f"ERROR in regularization approval: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return Response(
+                    {"error": f"Failed to update attendance: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
         # Notify employee about regularization status (DISABLED - causing timeout)
         # try:
@@ -988,11 +1002,11 @@ class RegularizationReviewView(APIView):
         # except Exception as e:
         #     print(f"Email notification failed: {e}")
 
-        # Log activity
-        try:
-            log_regularization_reviewed(request.user, regularization, new_status, request)
-        except Exception:
-            pass
+        # Log activity (DISABLED - causing timeout)
+        # try:
+        #     log_regularization_reviewed(request.user, regularization, new_status, request)
+        # except Exception:
+        #     pass
 
         return Response({
             "message": f"Regularization request {new_status}",
