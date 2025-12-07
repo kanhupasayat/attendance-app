@@ -926,13 +926,7 @@ class RegularizationReviewView(APIView):
                             status=status.HTTP_400_BAD_REQUEST
                         )
 
-        regularization.status = new_status
-        regularization.reviewed_by = request.user
-        regularization.reviewed_on = timezone.now()
-        regularization.review_remarks = review_remarks
-        regularization.save()
-
-        # If approved, update the attendance record
+        # If approved, update the attendance record FIRST (before regularization save to avoid signal timeout)
         if new_status == 'approved':
             try:
                 attendance, created = Attendance.objects.get_or_create(
@@ -983,10 +977,6 @@ class RegularizationReviewView(APIView):
                 print(f"Working Hours: {attendance.working_hours}, Status: {attendance.status}")
                 print(f"=== END DEBUG ===")
 
-                # Verify from database
-                attendance.refresh_from_db()
-                print(f"After DB Refresh - Punch In: {attendance.punch_in}, Punch Out: {attendance.punch_out}")
-
             except Exception as e:
                 print(f"ERROR in regularization approval: {str(e)}")
                 import traceback
@@ -995,6 +985,16 @@ class RegularizationReviewView(APIView):
                     {"error": f"Failed to update attendance: {str(e)}"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
+
+        # Update regularization using update() to avoid triggering signal (which causes timeout)
+        RegularizationRequest.objects.filter(pk=regularization.pk).update(
+            status=new_status,
+            reviewed_by=request.user,
+            reviewed_on=timezone.now(),
+            review_remarks=review_remarks
+        )
+        # Refresh to get updated data
+        regularization.refresh_from_db()
 
         # Notify employee about regularization status (DISABLED - causing timeout)
         # try:
