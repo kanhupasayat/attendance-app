@@ -46,9 +46,9 @@ def send_regularization_status_change_notification(sender, instance, created, **
                 related_id=instance.id
             )
 
-            # Email notification
-            send_regularization_status_email(
-                instance,
-                current_status,
-                instance.review_remarks or ''
-            )
+            # Email notification (DISABLED - causing worker timeout)
+            # send_regularization_status_email(
+            #     instance,
+            #     current_status,
+            #     instance.review_remarks or ''
+            # )
