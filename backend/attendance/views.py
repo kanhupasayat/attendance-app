@@ -1306,11 +1306,17 @@ class AutoPunchOutView(APIView):
                     punched_out_users.append(f"{attendance.user.name} ({attendance.date})")
                     count += 1
 
-                    # Send warning email to employee
+                    # Send in-app notification to employee
                     try:
-                        send_auto_punch_out_email(attendance)
+                        from accounts.models import Notification
+                        Notification.objects.create(
+                            user=attendance.user,
+                            title="Punch Out Bhool Gaye - Half Day Applied",
+                            message=f"Aapne {attendance.date} ko punch out nahi kiya. Half day (4 hours) credit kiya gaya hai. Agar aapne full day kaam kiya hai, to Regularization section me jaake request submit karein. Admin approve karega to full day credit ho jayega.",
+                            notification_type='auto_punch_out'
+                        )
                     except Exception as e:
-                        print(f"Failed to send email to {attendance.user.name}: {e}")
+                        print(f"Failed to create notification for {attendance.user.name}: {e}")
 
                 except Exception as e:
                     print(f"Error processing attendance {attendance.id}: {e}")
