@@ -1311,8 +1311,8 @@ class AutoPunchOutView(APIView):
                         from accounts.models import Notification
                         Notification.objects.create(
                             user=attendance.user,
-                            title="Punch Out Bhool Gaye - Half Day Applied",
-                            message=f"Aapne {attendance.date} ko punch out nahi kiya. Half day (4 hours) credit kiya gaya hai. Agar aapne full day kaam kiya hai, to Regularization section me jaake request submit karein. Admin approve karega to full day credit ho jayega.",
+                            title="Missed Punch Out - Half Day Applied",
+                            message=f"You forgot to punch out on {attendance.date}. Half day (4 hours) has been credited. If you worked full day, please submit a Regularization request with your actual punch out time. Admin will review and approve for full day credit.",
                             notification_type='auto_punch_out'
                         )
                     except Exception as e:
